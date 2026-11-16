@@ -1,0 +1,42 @@
+name: migrate
+# Перенос данных WordPress → PostgreSQL/Directus на сервере + копирование фото в том media.
+on:
+  workflow_dispatch:
+    inputs:
+      media:
+        description: "Скопировать фото в том media (yes/no)"
+        default: "yes"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Упаковать скрипты
+        run: |
+          tar czf etl.tgz -C migration etl
+          { echo 'ETL_B64<<EOF'; base64 -w0 etl.tgz; echo; echo EOF; } >> "$GITHUB_ENV"
+      - uses: appleboy/ssh-action@v1.2.0
+        env:
+          ETL_B64: ${{ env.ETL_B64 }}
+        with:
+          envs: ETL_B64
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 90m
+          script: |
+            set -e
+            cd /opt/top-barbershop
+            set -a; . ./.env; set +a
+            rm -rf migration/etl && mkdir -p migration && echo "$ETL_B64" | base64 -d | tar xz -C migration
+            docker network connect top-barbershop_default wp-mysql 2>/dev/null || true
+            docker run --rm --network top-barbershop_default -v "$PWD/migration/etl:/etl:ro" \
+              -e PG_DSN="postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB" \
+              python:3.12-slim sh -c "pip install -q --root-user-action=ignore -r /etl/requirements.txt && python /etl/etl.py"
+            if [ "${{ github.event.inputs.media }}" = yes ] && [ -d legacy/uploads ]; then
+              echo "== копирую фото в том media"
+              docker run --rm -v "$PWD/legacy:/src:ro" -v top-barbershop_media:/dst alpine:3.20 sh -c \
+                "cp -an /src/uploads/. /dst/ && mkdir -p /dst/logos && cp -an /src/logos/. /dst/logos/ 2>/dev/null; du -sh /dst; find /dst -type f | wc -l"
+            fi
+            docker compose restart directus
