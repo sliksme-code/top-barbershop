@@ -61,12 +61,23 @@
 			header_down Location "http://{$PROD_DOMAIN}" "https://{$PROD_DOMAIN}"
 			transport http {
 				tls_server_name {$LEGACY_HOST}
+				dial_timeout 5s
 			}
 		}
 	}
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		-Server
+	}
+	# старый хостинг недоступен → 503 + Retry-After вместо 502 (поисковики не выкидывают страницы)
+	handle_errors 502 503 504 {
+		header Retry-After 3600
+		header Content-Type "text/html; charset=utf-8"
+		root * /etc/caddy/deploy
+		rewrite * /maintenance.html
+		file_server {
+			status 503
+		}
 	}
 }
 
