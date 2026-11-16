@@ -38,4 +38,4 @@ jobs:
               N=$(docker exec wp-mysql mysql -uroot -plegacy -N -e "select count(*) from information_schema.tables where table_schema='wp'")
               if [ "$N" = 0 ]; then echo "Импорт дампа..."; time docker exec -i wp-mysql mysql -uroot -plegacy wp < legacy/wp-dump.sql; fi
             fi
-            echo "$SQL_B64" | base64 -d | docker exec -i wp-mysql mysql -uroot -plegacy wp --table 2>&1 | grep -v 'Using a password'
+            echo "$SQL_B64" | base64 -d | docker exec -i wp-mysql mysql -uroot -plegacy --default-character-set=utf8mb4 wp --table 2>&1 | grep -v 'Using a password'
