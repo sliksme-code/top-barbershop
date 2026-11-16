@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for p in 80 443 21; do timeout 6 bash -c "</dev/tcp/92.53.96.50/$p" && echo "tcp $p open" || echo "tcp $p closed"; done
-          curl -s -o /dev/null -w "tw1 %{http_code} %{size_download}\n" -H 'Cookie: realauth=SvBD85dINu3' --max-time 15 https://top-barbershop.tw1.ru/
-          R="--resolve top-barbershop.com:443:136.234.232.234"
-          for p in / /place/portos/; do curl -s $R -o /dev/null -w "$p %{http_code}\n" --max-time 30 https://top-barbershop.com$p; done
+          R="--resolve top-barbershop.com:443:136.234.232.234 --resolve www.top-barbershop.com:443:136.234.232.234"
+          for p in / /place/portos/ /poin/ /api/health/; do curl -s $R -D /tmp/h -o /tmp/b -w "$p %{http_code} %{size_download}B\n" --max-time 30 https://top-barbershop.com$p; grep -i retry-after /tmp/h; done
+          grep -o '<h1>[^<]*' /tmp/b || true
+          curl -s $R -o /dev/null -w "www %{http_code} %{redirect_url}\n" https://www.top-barbershop.com/
