@@ -1,0 +1,42 @@
+name: legacy-inspect
+# Поднимает на сервере изолированный MySQL с дампом WordPress (без внешних портов) и выполняет SQL из migration/.
+on:
+  workflow_dispatch:
+    inputs:
+      sql:
+        description: "SQL-файл из migration/"
+        default: inspect.sql
+      reimport:
+        description: "Переимпортировать дамп (yes/no)"
+        default: "no"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "migration/"
+          target: /opt/top-barbershop
+      - uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 60m
+          script: |
+            set -e
+            cd /opt/top-barbershop
+            if [ "${{ github.event.inputs.reimport }}" = yes ]; then docker rm -f wp-mysql 2>/dev/null || true; docker volume rm wp_mysql 2>/dev/null || true; fi
+            if ! docker ps --format '{{.Names}}' | grep -q '^wp-mysql$'; then
+              docker run -d --name wp-mysql --restart unless-stopped -e MYSQL_ROOT_PASSWORD=legacy -e MYSQL_DATABASE=wp \
+                -v wp_mysql:/var/lib/mysql mysql:5.7 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --max_allowed_packet=512M --innodb-buffer-pool-size=512M
+              until docker exec wp-mysql mysqladmin -uroot -plegacy ping >/dev/null 2>&1; do sleep 3; done
+              N=$(docker exec wp-mysql mysql -uroot -plegacy -N -e "select count(*) from information_schema.tables where table_schema='wp'")
+              if [ "$N" = 0 ]; then echo "Импорт дампа..."; time docker exec -i wp-mysql mysql -uroot -plegacy wp < legacy/wp-dump.sql; fi
+            fi
+            docker exec -i wp-mysql mysql -uroot -plegacy wp --table < migration/${{ github.event.inputs.sql }}
