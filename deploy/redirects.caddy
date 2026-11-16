@@ -5,5 +5,9 @@ redir /sp/ / 301
 redir /setup/ / 301
 redir /clipperkillah-28-oktyabrya-spb/ /zhurnal/ 301
 # Спам после взлома
-respond /poin* 410
-respond /barbaro* 410
+handle /poin* {
+	respond 410
+}
+handle /barbaro* {
+	respond 410
+}

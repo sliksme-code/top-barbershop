@@ -62,7 +62,7 @@ services:
       EMAIL_SMTP_PASSWORD: ${SMTP_PASSWORD}
       EMAIL_SMTP_SECURE: "true"
       # Вход через VK ID и Яндекс ID (OAuth2)
-      AUTH_PROVIDERS: yandex,vk
+      AUTH_PROVIDERS: ${AUTH_PROVIDERS:-}   # включить "yandex,vk" после получения ключей
       AUTH_YANDEX_DRIVER: oauth2
       AUTH_YANDEX_CLIENT_ID: ${YANDEX_OAUTH_CLIENT_ID}
       AUTH_YANDEX_CLIENT_SECRET: ${YANDEX_OAUTH_CLIENT_SECRET}

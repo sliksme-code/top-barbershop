@@ -69,3 +69,6 @@ jobs:
             WEB_TAG=${{ github.sha }} docker compose up -d --remove-orphans
             docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile || true
             docker image prune -f
+            sleep 45
+            docker compose ps
+            docker compose logs --tail 40 directus caddy
