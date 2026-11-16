@@ -35,6 +35,18 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./deploy/caddy
+          push: true
+          tags: ghcr.io/sliksme-code/top-barbershop-caddy:latest
+          cache-from: type=gha,scope=caddy
+          cache-to: type=gha,mode=max,scope=caddy
+      - name: Проверка конфигурации Caddy
+        run: |
+          docker run --rm -v "$PWD/deploy:/etc/caddy/deploy:ro" -e SITE_DOMAIN=new.top-barbershop.com -e CMS_DOMAIN=cms.new.top-barbershop.com \
+            -e PROD_DOMAIN=top-barbershop.com -e LEGACY_HOST=top-barbershop.tw1.ru \
+            ghcr.io/sliksme-code/top-barbershop-caddy:latest caddy validate --config /etc/caddy/deploy/Caddyfile --adapter caddyfile
 
   deploy:
     needs: build
@@ -66,7 +78,7 @@ jobs:
             if [ -n "$ENV_FILE" ]; then printf '%s\n' "$ENV_FILE" > .env; chmod 600 .env; fi
             test -s .env || { echo "Нет .env: задайте секрет ENV_FILE"; exit 1; }
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            WEB_TAG=${{ github.sha }} docker compose pull web
+            WEB_TAG=${{ github.sha }} docker compose pull web caddy
             WEB_TAG=${{ github.sha }} docker compose up -d --remove-orphans
             docker compose exec -T caddy caddy reload --config /etc/caddy/deploy/Caddyfile --adapter caddyfile
             docker image prune -f

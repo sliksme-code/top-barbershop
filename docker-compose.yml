@@ -4,12 +4,15 @@ name: top-barbershop
 
 services:
   caddy:
-    image: caddy:2.8-alpine
+    image: ghcr.io/sliksme-code/top-barbershop-caddy:latest
+    build: ./deploy/caddy
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     environment:
       SITE_DOMAIN: ${SITE_DOMAIN}
       CMS_DOMAIN: ${CMS_DOMAIN}
+      PROD_DOMAIN: ${PROD_DOMAIN:-top-barbershop.com}
+      LEGACY_HOST: ${LEGACY_HOST:-top-barbershop.tw1.ru}
     command: caddy run --config /etc/caddy/deploy/Caddyfile --adapter caddyfile
     volumes:
       - ./deploy:/etc/caddy/deploy:ro   # папка, а не файлы: иначе после обновления Caddy видит старую версию

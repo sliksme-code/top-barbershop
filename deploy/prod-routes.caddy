@@ -1,0 +1,8 @@
+# Разделы боевого домена, которые уже отдаёт новый стек (Astro). Добавляются по мере готовности шаблонов.
+# Пример:
+# handle /place/* {
+# 	reverse_proxy web:4321
+# }
+handle /api/health/ {
+	reverse_proxy web:4321
+}
