@@ -4,16 +4,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: DNS
-        run: |
-          for s in 8.8.8.8 1.1.1.1 77.88.8.8; do echo "$s: $(dig +short top-barbershop.com @$s | tr '\n' ' ') www: $(dig +short www.top-barbershop.com @$s | tr '\n' ' ')"; done
-      - name: HTTP via new server
-        run: |
-          R="--resolve top-barbershop.com:443:136.234.232.234 --resolve www.top-barbershop.com:443:136.234.232.234 --resolve top-barbershop.com:80:136.234.232.234"
-          for p in / /place/portos/ /poin/ /sp/ /api/health/ /robots.txt /sitemap.xml /wp-content/themes/barber2-child/style.css; do
-            curl -s $R -o /tmp/b -w "$p -> %{http_code} %{size_download}B redir=%{redirect_url} " --max-time 40 "https://top-barbershop.com$p"; echo "tw1=$(grep -c tw1.ru /tmp/b) http=$(grep -o 'http://top-barbershop' /tmp/b | wc -l)"
-          done
-          curl -s $R -o /dev/null -w "www -> %{http_code} %{redirect_url}\n" https://www.top-barbershop.com/
-          curl -s $R -o /dev/null -w "http -> %{http_code} %{redirect_url}\n" http://top-barbershop.com/
-          echo | openssl s_client -connect 136.234.232.234:443 -servername top-barbershop.com 2>/dev/null | openssl x509 -noout -issuer -subject -dates
-          curl -s $R https://top-barbershop.com/place/portos/ | grep -o '<title>[^<]*' 
+      - run: |
+          for p in 80 443 21; do timeout 6 bash -c "</dev/tcp/92.53.96.50/$p" && echo "tcp $p open" || echo "tcp $p closed"; done
+          curl -s -o /dev/null -w "tw1 %{http_code} %{size_download}\n" -H 'Cookie: realauth=SvBD85dINu3' --max-time 15 https://top-barbershop.tw1.ru/
+          R="--resolve top-barbershop.com:443:136.234.232.234"
+          for p in / /place/portos/; do curl -s $R -o /dev/null -w "$p %{http_code}\n" --max-time 30 https://top-barbershop.com$p; done
