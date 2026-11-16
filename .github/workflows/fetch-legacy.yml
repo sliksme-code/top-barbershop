@@ -13,7 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: appleboy/ssh-action@v1.2.0
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
         with:
+          envs: ENV_FILE
           host: ${{ secrets.VPS_HOST }}
           username: deploy
           key: ${{ secrets.VPS_SSH_KEY }}
@@ -21,6 +24,7 @@ jobs:
           script: |
             set -e
             cd /opt/top-barbershop
+            if [ -n "$ENV_FILE" ]; then printf '%s\n' "$ENV_FILE" > .env; chmod 600 .env; fi
             set -a; . ./.env; set +a
             : "${OLD_FTP_HOST:?нет OLD_FTP_HOST в ENV_FILE}"
             mkdir -p legacy && chmod 700 legacy
