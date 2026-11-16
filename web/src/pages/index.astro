@@ -1,0 +1,18 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../data/site';
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: site.name,
+  url: Astro.site?.href,
+  potentialAction: { '@type': 'SearchAction', target: `${Astro.site?.href}listings/?keyword={query}`, 'query-input': 'required name=query' },
+};
+---
+<Base jsonLd={jsonLd}>
+  <main>
+    <h1>{site.name} {site.tagline}</h1>
+    <p>Новая версия сайта в разработке. Каталог, города, журнал и кабинет владельца переносятся со старого сайта.</p>
+    <nav>{site.nav.map((n) => <a href={n.href}>{n.label}</a>)}</nav>
+  </main>
+</Base>

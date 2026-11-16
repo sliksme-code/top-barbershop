@@ -1,0 +1,9 @@
+# Генерируется migration/build_redirects.py. Не править руками.
+# Решение 8: мусорные страницы удаляются с 301 на релевантные разделы
+redir /fuck-coronavirus-stay-home/ / 301
+redir /sp/ / 301
+redir /setup/ / 301
+redir /clipperkillah-28-oktyabrya-spb/ /zhurnal/ 301
+# Спам после взлома
+respond /poin* 410
+respond /barbaro* 410

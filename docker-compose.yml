@@ -1,0 +1,126 @@
+# TOP BARBERSHOP — production stack
+# Сервисы: caddy (HTTPS/редиректы) → web (Astro SSR+SSG) → directus (CMS/API) → postgres; meilisearch (поиск); imgproxy (картинки)
+name: top-barbershop
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN}
+      CMS_DOMAIN: ${CMS_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/redirects.caddy:/etc/caddy/redirects.caddy:ro
+      - media:/srv/media:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web, directus]
+
+  web:
+    image: ghcr.io/sliksme-code/top-barbershop-web:${WEB_TAG:-latest}
+    build: ./web
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4321
+      SITE_URL: https://${SITE_DOMAIN}
+      SITE_ENV: ${SITE_ENV:-staging}
+      DIRECTUS_URL: http://directus:8055
+      DIRECTUS_TOKEN: ${DIRECTUS_WEB_TOKEN}
+      MEILI_URL: http://meilisearch:7700
+      MEILI_SEARCH_KEY: ${MEILI_SEARCH_KEY}
+      YANDEX_MAPS_KEY: ${YANDEX_MAPS_KEY}
+      SMARTCAPTCHA_CLIENT_KEY: ${SMARTCAPTCHA_CLIENT_KEY}
+      SMARTCAPTCHA_SERVER_KEY: ${SMARTCAPTCHA_SERVER_KEY}
+    depends_on: [directus, meilisearch]
+
+  directus:
+    image: directus/directus:11
+    restart: unless-stopped
+    environment:
+      PUBLIC_URL: https://${CMS_DOMAIN}
+      SECRET: ${DIRECTUS_SECRET}
+      ADMIN_EMAIL: ${DIRECTUS_ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${DIRECTUS_ADMIN_PASSWORD}
+      DB_CLIENT: pg
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      STORAGE_LOCATIONS: local
+      STORAGE_LOCAL_ROOT: /directus/uploads
+      CACHE_ENABLED: "true"
+      CACHE_STORE: memory
+      EMAIL_TRANSPORT: smtp
+      EMAIL_FROM: ${EMAIL_FROM}
+      EMAIL_SMTP_HOST: ${SMTP_HOST}
+      EMAIL_SMTP_PORT: ${SMTP_PORT}
+      EMAIL_SMTP_USER: ${SMTP_USER}
+      EMAIL_SMTP_PASSWORD: ${SMTP_PASSWORD}
+      EMAIL_SMTP_SECURE: "true"
+      # Вход через VK ID и Яндекс ID (OAuth2)
+      AUTH_PROVIDERS: yandex,vk
+      AUTH_YANDEX_DRIVER: oauth2
+      AUTH_YANDEX_CLIENT_ID: ${YANDEX_OAUTH_CLIENT_ID}
+      AUTH_YANDEX_CLIENT_SECRET: ${YANDEX_OAUTH_CLIENT_SECRET}
+      AUTH_YANDEX_AUTHORIZE_URL: https://oauth.yandex.ru/authorize
+      AUTH_YANDEX_ACCESS_URL: https://oauth.yandex.ru/token
+      AUTH_YANDEX_PROFILE_URL: https://login.yandex.ru/info?format=json
+      AUTH_YANDEX_IDENTIFIER_KEY: default_email
+      AUTH_YANDEX_EMAIL_KEY: default_email
+      AUTH_YANDEX_ALLOW_PUBLIC_REGISTRATION: "true"
+      AUTH_VK_DRIVER: oauth2
+      AUTH_VK_CLIENT_ID: ${VK_ID_CLIENT_ID}
+      AUTH_VK_CLIENT_SECRET: ${VK_ID_CLIENT_SECRET}
+      AUTH_VK_AUTHORIZE_URL: https://id.vk.com/authorize
+      AUTH_VK_ACCESS_URL: https://id.vk.com/oauth2/auth
+      AUTH_VK_PROFILE_URL: https://id.vk.com/oauth2/user_info
+      AUTH_VK_ALLOW_PUBLIC_REGISTRATION: "true"
+    volumes:
+      - media:/directus/uploads
+      - ./directus/extensions:/directus/extensions
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      retries: 10
+
+  meilisearch:
+    image: getmeili/meilisearch:v1.11
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
+      MEILI_ENV: production
+    volumes: [meili:/meili_data]
+
+  imgproxy:
+    image: darthsim/imgproxy:v3
+    restart: unless-stopped
+    environment:
+      IMGPROXY_LOCAL_FILESYSTEM_ROOT: /srv/media
+      IMGPROXY_AUTO_WEBP: "true"
+      IMGPROXY_AUTO_AVIF: "true"
+      IMGPROXY_KEY: ${IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT}
+    volumes: [media:/srv/media:ro]
+
+volumes:
+  pgdata:
+  meili:
+  media:
+  caddy_data:
+  caddy_config:
