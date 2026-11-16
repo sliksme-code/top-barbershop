@@ -1,0 +1,18 @@
+SELECT '== tables' AS x;
+SELECT table_name, table_rows FROM information_schema.tables WHERE table_schema=DATABASE() ORDER BY table_rows DESC LIMIT 60;
+SELECT '== prefix/options' AS x;
+SELECT option_name, LEFT(option_value,120) FROM wp_options WHERE option_name IN ('siteurl','home','template','stylesheet','db_version','permalink_structure','active_plugins');
+SELECT '== post types' AS x;
+SELECT post_type, post_status, COUNT(*) c FROM wp_posts GROUP BY post_type, post_status ORDER BY c DESC LIMIT 60;
+SELECT '== taxonomies' AS x;
+SELECT taxonomy, COUNT(*) c FROM wp_term_taxonomy GROUP BY taxonomy ORDER BY c DESC;
+SELECT '== listing meta keys (barbershop)' AS x;
+SELECT pm.meta_key, COUNT(*) c FROM wp_postmeta pm JOIN wp_posts p ON p.ID=pm.post_id WHERE p.post_type='barbershop' GROUP BY pm.meta_key ORDER BY c DESC LIMIT 120;
+SELECT '== sample barbershop' AS x;
+SELECT ID, post_name, post_title, post_status, post_modified FROM wp_posts WHERE post_type='barbershop' ORDER BY ID DESC LIMIT 5;
+SELECT '== users' AS x;
+SELECT COUNT(*) users, SUM(user_pass LIKE '$P$%') phpass, SUM(user_pass LIKE '$wp$%') wpbcrypt, MAX(user_registered) last_reg FROM wp_users;
+SELECT '== comments' AS x;
+SELECT comment_type, comment_approved, COUNT(*) FROM wp_comments GROUP BY comment_type, comment_approved;
+SELECT '== recent content' AS x;
+SELECT post_type, MAX(post_modified) FROM wp_posts WHERE post_status='publish' GROUP BY post_type;

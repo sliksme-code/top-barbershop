@@ -7,3 +7,4 @@ dist/
 migration/data/
 migration/out/
 .DS_Store
+!migration/*.sql
