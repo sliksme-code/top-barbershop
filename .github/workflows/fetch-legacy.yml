@@ -28,9 +28,10 @@ jobs:
             set -a; . ./.env; set +a
             : "${OLD_FTP_HOST:?нет OLD_FTP_HOST в ENV_FILE}"
             mkdir -p legacy && chmod 700 legacy
+            [ -z "$OLD_FTP_ROOT" ] || [ "$OLD_FTP_ROOT" = "/" ] && OLD_FTP_ROOT=/top-barbershop
             WHAT="${{ github.event.inputs.what }}"
             run_lftp() { docker run --rm -v "$PWD/legacy:/legacy" -e LFTP_PASSWORD="$OLD_FTP_PASS" alpine:3.20 sh -c "apk add -q lftp && lftp --env-password -u '$OLD_FTP_USER' -e \"set ftp:ssl-allow yes; set ssl:verify-certificate no; set net:max-retries 3; $1; bye\" '$OLD_FTP_HOST'"; }
-            echo "== содержимое корня FTP"; run_lftp "cls -l ${OLD_FTP_ROOT:-/}" | head -40 || true
+            echo "== $OLD_FTP_ROOT"; run_lftp "cls -l $OLD_FTP_ROOT/" | head -20 || true
             if [ "$WHAT" = dump ] || [ "$WHAT" = all ]; then
               run_lftp "get -c ${OLD_FTP_ROOT}/_QUARANTINE_2026-11-12_untitl_topbs_20260716.sql -o /legacy/wp-dump.sql"
               ls -la legacy/wp-dump.sql && head -c 300 legacy/wp-dump.sql
