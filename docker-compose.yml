@@ -10,9 +10,9 @@ services:
     environment:
       SITE_DOMAIN: ${SITE_DOMAIN}
       CMS_DOMAIN: ${CMS_DOMAIN}
+    command: caddy run --config /etc/caddy/deploy/Caddyfile --adapter caddyfile
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./deploy/redirects.caddy:/etc/caddy/redirects.caddy:ro
+      - ./deploy:/etc/caddy/deploy:ro   # папка, а не файлы: иначе после обновления Caddy видит старую версию
       - media:/srv/media:ro
       - caddy_data:/data
       - caddy_config:/config

@@ -12,7 +12,7 @@
 	encode zstd gzip
 
 	# 301/410 со старых URL WordPress (генерируется скриптом migration/build_redirects.py)
-	import /etc/caddy/redirects.caddy
+	import /etc/caddy/deploy/redirects.caddy
 
 	# Старые пути картинок и логотипов сохраняются 1:1
 	handle /media/* {

@@ -5,7 +5,7 @@
 | Каталог | Назначение |
 |---|---|
 | `web/` | Сайт на Astro, `Dockerfile` (сборка падает при ошибках SEO — `npm run check:html`) |
-| `Caddyfile`, `deploy/redirects.caddy` | HTTPS, 301/410 со старых URL, отдача `/media/` и `/logos/` по старым путям |
+| `deploy/Caddyfile`, `deploy/redirects.caddy` | HTTPS, 301/410 со старых URL, отдача `/media/` и `/logos/` по старым путям |
 | `directus/` | Расширения CMS (кабинет владельца, модерация, ЮKassa — этап 2) |
 | `migration/` | Перенос данных из WordPress |
 | `deploy/backup.sh` | Ежедневный бэкап БД и медиа в S3 |

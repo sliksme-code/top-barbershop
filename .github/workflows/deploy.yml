@@ -48,7 +48,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: deploy
           key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.yml,Caddyfile,deploy/"
+          source: "docker-compose.yml,deploy/"
           target: /opt/top-barbershop
       - name: Обновляем контейнеры
         uses: appleboy/ssh-action@v1.2.0
@@ -67,8 +67,9 @@ jobs:
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             WEB_TAG=${{ github.sha }} docker compose pull web
             WEB_TAG=${{ github.sha }} docker compose up -d --remove-orphans
-            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile || true
+            docker compose exec -T caddy caddy reload --config /etc/caddy/deploy/Caddyfile --adapter caddyfile
             docker image prune -f
             sleep 45
             docker compose ps
-            docker compose logs --tail 40 directus caddy
+            docker compose logs --tail 30 directus
+            curl -s -o /dev/null -w 'poin: %{http_code}\n' -H 'Host: '$(grep ^SITE_DOMAIN .env | cut -d= -f2) http://127.0.0.1/poin/ || true
