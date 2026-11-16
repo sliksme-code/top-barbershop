@@ -9,3 +9,4 @@ migration/out/
 .DS_Store
 !migration/*.sql
 !migration/**/*.sql
+__pycache__/
