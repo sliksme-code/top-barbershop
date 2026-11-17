@@ -1,0 +1,35 @@
+---
+import AccountLayout from '../components/AccountLayout.astro';
+import '../styles/forms.css';
+import { sql } from '../lib/db';
+import { sameOrigin, str, rateLimited } from '../lib/forms';
+import { sendMail, ADMIN_EMAIL } from '../lib/mail';
+const user = Astro.locals.user;
+const id = Number(Astro.url.searchParams.get('id')) || 0;
+if (!user) return Astro.redirect('/login/?next=' + encodeURIComponent(`/claim/?id=${id}`));
+const [shop] = id ? await sql`select id, slug, title, owner_id from barbershops where id = ${id} and status = 'published'` : [];
+if (!shop) return Astro.redirect('/my/');
+if (shop.owner_id === user.id) return Astro.redirect(`/edit/?id=${id}`);
+let done = false, err = '';
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  if (!sameOrigin(Astro.request) || rateLimited('claim:' + user.id, 5, 86400)) err = 'Слишком много заявок. Попробуйте завтра.';
+  else {
+    await sql`insert into claims (barbershop_id, user_id, name, phone, message) values (${id}, ${user.id}, ${str(f, 'name', 100)}, ${str(f, 'phone', 40)}, ${str(f, 'message', 1000)})`;
+    if (ADMIN_EMAIL) sendMail(ADMIN_EMAIL, `Заявка на владение: ${shop.title}`, `${user.email} просит доступ к https://top-barbershop.com/place/${shop.slug}/\nТелефон: ${str(f, 'phone', 40)}\n${str(f, 'message', 1000)}\nЗаявки: https://cms.top-barbershop.com/admin/content/claims`);
+    done = true;
+  }
+}
+---
+<AccountLayout title={`Это мой барбершоп: ${shop.title}`}>
+  {err && <p class="msg err">{err}</p>}
+  {done ? <p class="msg ok">Заявка отправлена. Мы свяжемся с вами для подтверждения — обычно в течение суток. После одобрения барбершоп появится в разделе <a href="/my/">«Мои барбершопы»</a>.</p> : (
+    <form method="post" class="frm narrow">
+      <p class="alt">Чтобы управлять карточкой, подтвердите, что вы владелец или управляющий. Мы перезвоним по номеру барбершопа или свяжемся с вами.</p>
+      <label>Ваше имя и должность <input class="field" name="name" required maxlength="100" value={user.display_name || ''} /></label>
+      <label>Телефон для связи <input class="field" name="phone" required maxlength="40" inputmode="tel" value={user.phone || ''} /></label>
+      <label>Комментарий <textarea class="field" name="message" maxlength="1000"></textarea></label>
+      <div><button class="btn brass">Отправить заявку</button></div>
+    </form>
+  )}
+</AccountLayout>

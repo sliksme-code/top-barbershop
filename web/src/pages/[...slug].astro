@@ -16,7 +16,7 @@ if (parts.length !== 1) return Astro.rewrite('/404/');
 const slug = decodeURIComponent(parts[0]);
 if (slug === 'home') return Astro.redirect('/', 301);
 
-const DASHBOARD = ['login', 'register', 'add', 'edit', 'my', 'my-favorites', 'my-watchdogs', 'change-password', 'setup', 'invoices', 'transactions', 'payment', 'remove', 'logout', 'dobavit-vakansiyu'];
+const DASHBOARD = ['my-watchdogs', 'setup', 'invoices', 'transactions', 'payment', 'remove', 'dobavit-vakansiyu'];
 const [post] = await sql`select p.*, (select json_agg(json_build_object('slug', c.slug, 'name', c.name)) from post_categories pc join categories c on c.id = pc.category_id where pc.post_id = p.id) cats from posts p where p.slug = ${slug} and p.status = 'published'`;
 const [pg] = post ? [] : await sql`select * from pages where slug = ${slug} and status = 'published'`;
 if (!post && !pg && !DASHBOARD.includes(slug)) return Astro.rewrite('/404/');

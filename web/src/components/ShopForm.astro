@@ -1,0 +1,150 @@
+---
+import '../styles/forms.css';
+import Captcha from './Captcha.astro';
+import { img } from '../lib/img';
+const { refs, v = {}, metroSel = [], submit = 'Сохранить' } = Astro.props as { refs: any; v?: any; metroSel?: number[]; submit?: string };
+const svc = refs.features.filter((f: any) => f.kind === 'service');
+const am = refs.features.filter((f: any) => f.kind === 'amenity');
+const hours = Object.fromEntries(((v.opening_hours || []) as any[]).map((h) => [h.day, h]));
+const isNew = !v.id;
+const DAYS = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+const groups: Record<string, any[]> = {};
+for (const l of refs.locations) (groups[l.country || 'Страны'] ||= []).push(l);
+const photos = [v.cover_image, ...((v.gallery as string[]) || [])].filter(Boolean);
+const text = (h?: string | null) => (h || '').replace(/<\/p>\s*<p[^>]*>/g, '\n\n').replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
+const mapKey = process.env.YANDEX_MAPS_KEY || '';
+const metroMsk = refs.metros.filter((m: any) => m.city_code === 'Мск'), metroSpb = refs.metros.filter((m: any) => m.city_code === 'СПб');
+const cityPath = refs.locations.find((l: any) => l.id === v.location_id)?.path || '';
+---
+<form method="post" enctype="multipart/form-data" class="frm" id="shopform">
+  <fieldset>
+    <legend>Основное</legend>
+    <label>Название барбершопа <input class="field" name="title" required maxlength="120" value={v.title} /></label>
+    <div class="row">
+      <label>Город
+        <select class="field" name="location_id" required id="city">
+          <option value="">— выберите —</option>
+          {Object.entries(groups).map(([g, ls]) => <optgroup label={g}>{ls.map((l: any) => <option value={l.id} data-path={l.path} selected={l.id === v.location_id}>{l.name}</option>)}</optgroup>)}
+        </select>
+      </label>
+      <label>Адрес <small>улица, дом</small><input class="field" name="address" required maxlength="200" value={v.address} id="addr" /></label>
+    </div>
+    <div class="map" id="pick" style="height:300px" data-key={mapKey}></div>
+    <p class="alt" style="margin:0">Точка на карте ставится по адресу автоматически — её можно перетащить.</p>
+    <input type="hidden" name="lat" value={v.lat ?? ''} id="lat" /><input type="hidden" name="lng" value={v.lng ?? ''} id="lng" />
+    <details open={metroSel.length > 0 || /russia\/(msk|spb)/.test(cityPath)}>
+      <summary><b>Станции метро</b> <small class="muted">до 5</small></summary>
+      <details data-city="msk" open={cityPath.startsWith('russia/msk')}><summary>Москва</summary><div class="grid2">{metroMsk.map((m: any) => <label class="check"><input type="checkbox" name="metro" value={m.id} checked={metroSel.includes(m.id)} /> {m.name.replace(/\s*\(Мск\)/, '')}</label>)}</div></details>
+      <details data-city="spb" open={cityPath.startsWith('russia/spb')}><summary>Санкт-Петербург</summary><div class="grid2">{metroSpb.map((m: any) => <label class="check"><input type="checkbox" name="metro" value={m.id} checked={metroSel.includes(m.id)} /> {m.name.replace(/\s*\(СПб\)/, '')}</label>)}</div></details>
+    </details>
+  </fieldset>
+
+  <fieldset>
+    <legend>Контакты и запись</legend>
+    <div class="row">
+      <label>Телефон <input class="field" name="phone" maxlength="40" value={v.phone} inputmode="tel" /></label>
+      <label>E-mail <input class="field" name="email" type="email" maxlength="120" value={v.email} /></label>
+    </div>
+    <div class="row">
+      <label>Сайт <input class="field" name="website" maxlength="200" value={v.website} placeholder="https://" /></label>
+      <label>Ссылка на онлайн-запись <small>YCLIENTS, DIKIDI и т. п.</small><input class="field" name="booking_url" maxlength="300" value={v.booking_url} placeholder="https://" /></label>
+    </div>
+    <div class="row">
+      <label>ВКонтакте <input class="field" name="vk" maxlength="200" value={v.vk} /></label>
+      <label>Instagram <input class="field" name="instagram" maxlength="200" value={v.instagram} /></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Цены, ₽</legend>
+    <div class="grid2">{svc.map((f: any) => <label>{f.label}<input class="field" name={'svc_' + f.key} inputmode="numeric" maxlength="7" value={v.services?.[f.key] ?? ''} /></label>)}</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Часы работы</legend>
+    {DAYS.map((d, i) => {
+      const h = hours[i + 1];
+      const off = !isNew && v.opening_hours && !h;
+      return (
+        <div class="hrow">
+          <span>{d}</span>
+          <input class="field" type="time" name={'from_' + (i + 1)} value={h?.from || '10:00'} aria-label={`${d}, с`} />
+          <input class="field" type="time" name={'to_' + (i + 1)} value={h?.to || '22:00'} aria-label={`${d}, до`} />
+          <label class="check"><input type="checkbox" name={'off_' + (i + 1)} checked={off} /> выходной</label>
+        </div>
+      );
+    })}
+  </fieldset>
+
+  <fieldset>
+    <legend>Удобства</legend>
+    <div class="grid2">{am.map((f: any) => <label class="check"><input type="checkbox" name={'am_' + f.key} checked={(v.amenities || []).includes(f.key)} /> {f.label}</label>)}</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Описание</legend>
+    <textarea class="field" name="description" maxlength="6000" placeholder="Атмосфера, мастера, чем вы отличаетесь">{text(v.description)}</textarea>
+  </fieldset>
+
+  <fieldset>
+    <legend>Фотографии</legend>
+    {photos.length > 0 && (
+      <div class="ph">
+        {photos.map((p, i) => (
+          <div class="ph-i">
+            <img src={img(p, 240, 160)} alt="" width="240" height="160" onerror="this.src='/placeholder.svg'" />
+            <label class="check"><input type="checkbox" name="keep_photo" value={p} checked /> оставить</label>
+            <label class="check"><input type="radio" name="cover" value={p} checked={i === 0} /> обложка</label>
+          </div>
+        ))}
+      </div>
+    )}
+    <label>Добавить фото <small>JPG, PNG или WebP, до 10 МБ, не больше 15 штук. Первое станет обложкой.</small><input type="file" name="photos" accept="image/jpeg,image/png,image/webp" multiple /></label>
+  </fieldset>
+  {isNew && <Captcha />}
+  <p class="alt">{isNew ? 'Новый барбершоп появится в каталоге после проверки модератором (обычно в течение суток).' : 'Изменения появятся на сайте сразу.'}</p>
+  <div><button class="btn brass" type="submit">{submit}</button></div>
+</form>
+<style>
+.hrow{display:grid;grid-template-columns:130px 1fr 1fr auto;gap:10px;align-items:center}
+.hrow>*{min-width:0}
+.ph{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.ph-i{display:grid;gap:4px;font-size:14px}.ph-i img{border-radius:8px;width:100%;aspect-ratio:3/2;object-fit:cover}
+details summary{cursor:pointer;padding:6px 0}
+details details{margin-left:8px}
+@media (max-width:560px){.hrow{grid-template-columns:1fr 1fr}.hrow span{grid-column:1/-1;font-weight:600}}
+</style>
+<script is:inline>
+(function () {
+  var el = document.getElementById('pick'); if (!el) return;
+  var lat = document.getElementById('lat'), lng = document.getElementById('lng'), addr = document.getElementById('addr'), city = document.getElementById('city');
+  city.addEventListener('change', function () {
+    var p = city.selectedOptions[0] && city.selectedOptions[0].dataset.path || '';
+    document.querySelectorAll('details[data-city]').forEach(function (d) { d.open = p.indexOf('russia/' + d.dataset.city) === 0; if (d.open) d.parentElement.open = true; });
+  });
+  var s = document.createElement('script');
+  s.src = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU' + (el.dataset.key ? '&apikey=' + el.dataset.key : '');
+  s.onload = function () { ymaps.ready(init); };
+  document.head.appendChild(s);
+  function init() {
+    var start = lat.value && lng.value ? [+lat.value, +lng.value] : [55.751, 37.618];
+    var map = new ymaps.Map(el, { center: start, zoom: lat.value ? 16 : 10, controls: ['zoomControl'] });
+    var pm = new ymaps.Placemark(start, {}, { draggable: true, preset: 'islands#redDotIcon', visible: !!lat.value });
+    map.geoObjects.add(pm);
+    function set(c) { pm.geometry.setCoordinates(c); pm.options.set('visible', true); lat.value = c[0].toFixed(6); lng.value = c[1].toFixed(6); }
+    pm.events.add('dragend', function () { set(pm.geometry.getCoordinates()); });
+    map.events.add('click', function (e) { set(e.get('coords')); });
+    var t;
+    function geo() {
+      var c = city.selectedOptions[0] ? city.selectedOptions[0].textContent : '';
+      if (!addr.value.trim()) return;
+      ymaps.geocode(c + ', ' + addr.value, { results: 1 }).then(function (r) {
+        var o = r.geoObjects.get(0); if (!o) return;
+        var co = o.geometry.getCoordinates(); set(co); map.setCenter(co, 16);
+      });
+    }
+    addr.addEventListener('input', function () { clearTimeout(t); t = setTimeout(geo, 900); });
+    city.addEventListener('change', geo);
+  }
+})();
+</script>

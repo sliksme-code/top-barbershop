@@ -1,0 +1,5 @@
+---
+import { destroySession } from '../lib/auth';
+await destroySession(Astro.cookies);
+return Astro.redirect('/');
+---

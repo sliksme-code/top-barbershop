@@ -1,0 +1,25 @@
+---
+import Base from '../layouts/Base.astro';
+const { title, active } = Astro.props as { title: string; active?: string };
+const user = Astro.locals.user;
+const tabs = [['/my/', 'Мои барбершопы'], ['/my-favorites/', 'Избранное'], ['/add/', 'Добавить барбершоп'], ['/change-password/', 'Пароль']];
+---
+<Base title={`${title} — TOP BARBERSHOP`} description="Личный кабинет TOP BARBERSHOP" noindex>
+  <div class="wrap acc">
+    {user && (
+      <nav class="acc-tabs" aria-label="Кабинет">
+        {tabs.map(([h, l]) => <a href={h} class={active === h ? 'on' : ''}>{l}</a>)}
+        <form method="post" action="/logout/"><button class="lnk">Выйти</button></form>
+      </nav>
+    )}
+    <h1>{title}</h1>
+    <slot />
+  </div>
+</Base>
+<style>
+.acc{padding:24px 0 10px}
+.acc-tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px;align-items:center}
+.acc-tabs a,.acc-tabs .lnk{padding:9px 14px;border-radius:10px;text-decoration:none;border:1px solid var(--line);background:#fff;font-weight:600;font-size:15px;cursor:pointer;color:var(--ink)}
+.acc-tabs a.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.acc-tabs form{margin-left:auto}
+</style>

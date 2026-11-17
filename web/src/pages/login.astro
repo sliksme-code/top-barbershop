@@ -1,0 +1,30 @@
+---
+import AccountLayout from '../components/AccountLayout.astro';
+import '../styles/forms.css';
+import { verifyLogin, createSession } from '../lib/auth';
+import { rateLimited, ipOf, sameOrigin, str } from '../lib/forms';
+const next0 = Astro.url.searchParams.get('next') || '/my/';
+const next = next0.startsWith('/') && !next0.startsWith('//') ? next0 : '/my/';
+if (Astro.locals.user) return Astro.redirect(next);
+let err = '', login = '';
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  login = str(f, 'login', 120);
+  if (!sameOrigin(Astro.request)) err = 'Обновите страницу и попробуйте снова.';
+  else if (rateLimited('login:' + ipOf(Astro.request), 10)) err = 'Слишком много попыток. Подождите 10 минут.';
+  else {
+    const u = await verifyLogin(login, str(f, 'password', 200));
+    if (u) { await createSession(Astro.cookies, u.id, Astro.request); return Astro.redirect(next); }
+    err = 'Неверный e-mail или пароль.';
+  }
+}
+---
+<AccountLayout title="Вход">
+  {err && <p class="msg err">{err}</p>}
+  <form method="post" class="frm narrow">
+    <label>E-mail или логин <input class="field" name="login" required autocomplete="username" value={login} /></label>
+    <label>Пароль <input class="field" name="password" type="password" required autocomplete="current-password" /></label>
+    <div><button class="btn brass">Войти</button></div>
+    <p class="alt">Пароль от старого сайта подходит. <a href="/lost-password/">Забыли пароль?</a> · <a href="/register/">Регистрация</a></p>
+  </form>
+</AccountLayout>

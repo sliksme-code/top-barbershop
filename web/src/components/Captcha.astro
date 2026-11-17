@@ -1,0 +1,6 @@
+---
+const key = process.env.SMARTCAPTCHA_CLIENT_KEY;
+const on = Boolean(key && process.env.SMARTCAPTCHA_SERVER_KEY);
+---
+{on && <><div class="smart-captcha" data-sitekey={key} style="min-height:100px"></div><script is:inline src="https://smartcaptcha.yandexcloud.net/captcha.js" defer></script></>}
+<div style="position:absolute;left:-5000px" aria-hidden="true"><input type="text" name="website_url" tabindex="-1" autocomplete="off" /></div>

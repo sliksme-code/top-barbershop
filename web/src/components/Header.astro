@@ -6,6 +6,7 @@ const cities = [
   ['/location/ukraina/kiev/', 'Киев'],
 ];
 const q = Astro.url.searchParams.get('q') ?? '';
+const user = Astro.locals.user;
 ---
 <header class="hdr">
   <div class="wrap hdr-in">
@@ -28,7 +29,8 @@ const q = Astro.url.searchParams.get('q') ?? '';
       <label class="sr" for="hq">Поиск барбершопа</label>
       <input id="hq" name="q" value={q} placeholder="Барбершоп, улица, метро" class="field" />
     </form>
-    <a href="/owners/" class="btn brass sm hdr-cta">Добавить барбершоп</a>
+    <a href={user ? '/my/' : '/login/'} class="hdr-user">{user ? 'Кабинет' : 'Войти'}</a>
+    <a href={user ? '/add/' : '/owners/'} class="btn brass sm hdr-cta">Добавить барбершоп</a>
     <details class="burger">
       <summary aria-label="Меню"><span></span><span></span><span></span></summary>
       <div class="burger-menu">
@@ -40,7 +42,8 @@ const q = Astro.url.searchParams.get('q') ?? '';
         <a href="/zhurnal/">Журнал</a>
         <a href="/school/">Школы барберов</a>
         <a href="/vacancy/">Вакансии</a>
-        <a href="/owners/" class="btn brass">Добавить барбершоп</a>
+        <a href={user ? '/my/' : '/login/'}>{user ? 'Личный кабинет' : 'Войти'}</a>
+        <a href={user ? '/add/' : '/owners/'} class="btn brass">Добавить барбершоп</a>
       </div>
     </details>
   </div>
@@ -61,6 +64,7 @@ const q = Astro.url.searchParams.get('q') ?? '';
 .hdr-search .field{background:#221d18;border-color:#3a332b;color:#fff;padding:10px 16px}
 .hdr-search .field::placeholder{color:#9b9184}
 .hdr-cta{flex:none}
+.hdr-user{color:#e9e1d5;text-decoration:none;font-weight:600;white-space:nowrap;flex:none}.hdr-user:hover{color:var(--brass2)}
 .burger{display:none;margin-left:auto}
 .burger summary{list-style:none;cursor:pointer;width:44px;height:44px;display:grid;place-content:center;gap:5px}
 .burger summary::-webkit-details-marker{display:none}
@@ -70,5 +74,5 @@ const q = Astro.url.searchParams.get('q') ?? '';
 .burger-menu .btn{margin-top:14px}
 .burger-menu form{margin-bottom:8px}
 @media (max-width:1180px){.hdr-cta{display:none}}
-@media (max-width:980px){.hdr-nav,.hdr-search{display:none}.burger{display:block}}
+@media (max-width:980px){.hdr-nav,.hdr-search,.hdr-user{display:none}.burger{display:block}}
 </style>

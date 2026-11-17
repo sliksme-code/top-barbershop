@@ -1,0 +1,40 @@
+---
+import AccountLayout from '../components/AccountLayout.astro';
+import Captcha from '../components/Captcha.astro';
+import '../styles/forms.css';
+import { sql } from '../lib/db';
+import { hashPassword, createSession } from '../lib/auth';
+import { rateLimited, ipOf, sameOrigin, str, validEmail, captchaOk } from '../lib/forms';
+if (Astro.locals.user) return Astro.redirect('/my/');
+let err = '', name = '', email = '';
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  name = str(f, 'name', 80); email = str(f, 'email', 120).toLowerCase();
+  const pw = str(f, 'password', 200);
+  if (!sameOrigin(Astro.request) || str(f, 'website_url')) err = 'Обновите страницу и попробуйте снова.';
+  else if (rateLimited('reg:' + ipOf(Astro.request), 5, 3600)) err = 'Слишком много регистраций с вашего адреса. Попробуйте позже.';
+  else if (!validEmail(email)) err = 'Проверьте e-mail.';
+  else if (pw.length < 8) err = 'Пароль — не короче 8 символов.';
+  else if (!f.get('agree')) err = 'Нужно согласие с правилами сервиса.';
+  else if (!(await captchaOk(f, Astro.request))) err = 'Подтвердите, что вы не робот.';
+  else if ((await sql`select 1 from site_users where lower(email) = ${email}`).length) err = 'Этот e-mail уже зарегистрирован. Войдите или восстановите пароль.';
+  else {
+    const [u] = await sql`insert into site_users (login, email, display_name, role, pass_hash, registered_at) values (${email}, ${email}, ${name || null}, 'author', ${hashPassword(pw)}, now()) returning id`;
+    await createSession(Astro.cookies, u.id, Astro.request);
+    return Astro.redirect('/my/?welcome=1');
+  }
+}
+---
+<AccountLayout title="Регистрация">
+  <p class="alt" style="max-width:640px">Аккаунт нужен, чтобы добавить барбершоп, управлять его карточкой, оставлять отзывы и сохранять избранное.</p>
+  {err && <p class="msg err">{err}</p>}
+  <form method="post" class="frm narrow">
+    <label>Имя <input class="field" name="name" maxlength="80" autocomplete="name" value={name} /></label>
+    <label>E-mail <input class="field" name="email" type="email" required autocomplete="email" value={email} /></label>
+    <label>Пароль <small>не короче 8 символов</small><input class="field" name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+    <label class="check"><input type="checkbox" name="agree" required /> <span>Принимаю <a href="/policy/" target="_blank">правила сервиса и соглашаюсь на обработку персональных данных</a></span></label>
+    <Captcha />
+    <div><button class="btn brass">Зарегистрироваться</button></div>
+    <p class="alt">Уже есть аккаунт? <a href="/login/">Войти</a></p>
+  </form>
+</AccountLayout>

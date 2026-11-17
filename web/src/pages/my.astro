@@ -1,0 +1,48 @@
+---
+import AccountLayout from '../components/AccountLayout.astro';
+import '../styles/forms.css';
+import { sql } from '../lib/db';
+import { img } from '../lib/img';
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login/?next=/my/');
+const shops = await sql`select b.id, b.slug, b.title, b.status, b.address, coalesce(b.cover_image, b.gallery->>0) cover, l.name city, b.rating::float rating, b.reviews_count
+  from barbershops b left join locations l on l.id = b.location_id where (b.owner_id = ${user.id} or b.submitted_by = ${user.id}) and b.status <> 'trash' order by b.title`;
+const claims = await sql`select c.status, b.title, b.slug from claims c join barbershops b on b.id = c.barbershop_id where c.user_id = ${user.id} and c.status <> 'approved' order by c.created_at desc`;
+const st: Record<string, string> = { published: 'Опубликован', pending: 'На модерации', draft: 'Черновик' };
+const saved = Astro.url.searchParams.get('saved');
+---
+<AccountLayout title="Мои барбершопы" active="/my/">
+  {Astro.url.searchParams.get('welcome') && <p class="msg ok">Добро пожаловать{user.display_name ? ', ' + user.display_name : ''}! Добавьте свой барбершоп или найдите его в каталоге и нажмите «Это мой барбершоп».</p>}
+  {saved === 'new' && <p class="msg ok">Барбершоп отправлен на модерацию. Мы опубликуем его после проверки.</p>}
+  {saved === '1' && <p class="msg ok">Изменения сохранены.</p>}
+  {shops.length === 0 ? (
+    <div class="panel" style="max-width:720px">
+      <p>У вас пока нет барбершопов в каталоге.</p>
+      <p class="alt">Если ваш барбершоп уже есть на сайте — откройте его карточку и нажмите «Это мой барбершоп». Если нет — добавьте новый.</p>
+      <a class="btn brass" href="/add/">Добавить барбершоп</a>
+    </div>
+  ) : (
+    <div class="my">
+      {shops.map((s) => (
+        <div class="panel my-i">
+          <img src={img(s.cover, 240, 160)} alt="" width="120" height="80" onerror="this.src='/placeholder.svg'" />
+          <div class="my-b">
+            <b>{s.status === 'published' ? <a href={`/place/${s.slug}/`}>{s.title}</a> : s.title}</b>
+            <span class="muted">{[s.city, s.address].filter(Boolean).join(', ')}</span>
+            <span><span class={`badge ${s.status === 'published' ? 'top' : ''}`}>{st[s.status] || s.status}</span> {s.rating ? `★ ${s.rating.toFixed(1)} · отзывов: ${s.reviews_count}` : ''}</span>
+          </div>
+          <a class="btn sm" href={`/edit/?id=${s.id}`}>Редактировать</a>
+        </div>
+      ))}
+    </div>
+  )}
+  {claims.length > 0 && <><h2 style="margin-top:32px">Заявки на владение</h2><ul>{claims.map((c) => <li><a href={`/place/${c.slug}/`}>{c.title}</a> — {c.status === 'pending' ? 'на рассмотрении' : 'отклонена'}</li>)}</ul></>}
+</AccountLayout>
+<style>
+.my{display:grid;gap:12px;max-width:900px}
+.my-i{display:flex;gap:16px;align-items:center}
+.my-i img{width:120px;height:80px;object-fit:cover;border-radius:8px;flex:none}
+.my-b{display:grid;gap:3px;flex:1;min-width:0}.my-b a{text-decoration:none}
+.my-i .badge{background:var(--line)}.my-i .badge.top{background:var(--brass)}
+@media (max-width:600px){.my-i{flex-wrap:wrap}.my-i img{width:100%;height:auto;aspect-ratio:3/2}}
+</style>

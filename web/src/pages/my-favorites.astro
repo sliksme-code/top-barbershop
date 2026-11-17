@@ -1,0 +1,12 @@
+---
+import AccountLayout from '../components/AccountLayout.astro';
+import ShopCard from '../components/ShopCard.astro';
+import { sql } from '../lib/db';
+import { listShops } from '../lib/catalog';
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login/?next=/my-favorites/');
+const data = await listShops(sql`b.id in (select barbershop_id from favorites where user_id = ${user.id})`, 1, 200);
+---
+<AccountLayout title="Избранное" active="/my-favorites/">
+  {data.items.length === 0 ? <p class="alt">Здесь будут барбершопы, которые вы отметите сердечком на их странице.</p> : <div class="grid">{data.items.map((s) => <ShopCard s={s} />)}</div>}
+</AccountLayout>

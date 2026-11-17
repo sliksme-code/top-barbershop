@@ -1,0 +1,15 @@
+.frm{display:grid;gap:16px;max-width:720px}
+.frm.narrow{max-width:440px}
+.frm label{display:grid;gap:6px;font-weight:600;font-size:15px}
+.frm label small{font-weight:400;color:var(--muted)}
+.frm .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.frm .row>*{min-width:0}
+.frm fieldset{border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;background:#fff;display:grid;gap:12px;min-width:0}
+.frm legend{font-weight:750;padding:0 6px}
+.frm .check{display:flex;gap:8px;align-items:center;font-weight:450}
+.frm .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.frm textarea.field{min-height:160px;resize:vertical}
+.msg{padding:12px 16px;border-radius:12px;margin:0 0 16px;max-width:720px}
+.msg.err{background:#fbe9e7;border:1px solid #e6b3ac;color:#7d1f17}
+.msg.ok{background:#e8f4ec;border:1px solid #b5d9c2;color:#1f5a37}
+.alt{font-size:15px;color:var(--muted)}

@@ -1,0 +1,29 @@
+---
+import AccountLayout from '../components/AccountLayout.astro';
+import ShopForm from '../components/ShopForm.astro';
+import { formRefs, readShopForm, saveShop } from '../lib/shopform';
+import { sameOrigin, rateLimited, captchaOk, str } from '../lib/forms';
+import { sendMail, ADMIN_EMAIL } from '../lib/mail';
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login/?next=/add/');
+const refs = await formRefs();
+let errors: string[] = [], v: any = {}, metroSel: number[] = [];
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const r = await readShopForm(f, refs.features);
+  v = r.data; metroSel = r.metroIds; errors = r.errors;
+  if (!sameOrigin(Astro.request) || str(f, 'website_url')) errors.push('Обновите страницу и попробуйте снова.');
+  if (rateLimited('add:' + user.id, 10, 86400)) errors.push('Слишком много новых барбершопов за сутки.');
+  if (!errors.length && !(await captchaOk(f, Astro.request))) errors.push('Подтвердите, что вы не робот.');
+  if (!errors.length) {
+    const id = await saveShop(v, metroSel, user.id);
+    if (ADMIN_EMAIL) sendMail(ADMIN_EMAIL, `Новый барбершоп на модерации: ${v.title}`, `Пользователь ${user.email} добавил «${v.title}», ${v.address}.\nМодерация: https://cms.top-barbershop.com/admin/content/barbershops/${id}`);
+    return Astro.redirect('/my/?saved=new');
+  }
+}
+---
+<AccountLayout title="Добавить барбершоп" active="/add/">
+  {errors.length > 0 && <div class="msg err">{errors.map((e) => <div>{e}</div>)}</div>}
+  <p class="alt" style="max-width:720px">Добавление бесплатное. Барбершоп появится в каталоге после проверки. Только мужские парикмахерские и барбершопы.</p>
+  <ShopForm {refs} {v} {metroSel} submit="Отправить на модерацию" />
+</AccountLayout>
