@@ -5,7 +5,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          R="--resolve top-barbershop.com:443:136.234.232.234 --resolve www.top-barbershop.com:443:136.234.232.234"
-          for p in / /place/portos/ /poin/ /api/health/; do curl -s $R -D /tmp/h -o /tmp/b -w "$p %{http_code} %{size_download}B\n" --max-time 30 https://top-barbershop.com$p; grep -i retry-after /tmp/h; done
-          grep -o '<h1>[^<]*' /tmp/b || true
-          curl -s $R -o /dev/null -w "www %{http_code} %{redirect_url}\n" https://www.top-barbershop.com/
+          set +e
+          for p in / /place/portos/ /place/portos/2/ /location/russia/msk/ /location/russia/msk/page/2/ /metro/belorusskaya-msk/ /all/oldboy/ /zhurnal/ /muzhskoe-brite-10-sovetov/ /goroda/ /school/ /vacancy/ /search/?q=oldboy /sitemap.xml /feed/ /robots.txt /poin/ /sp/ /nope/ /media/2017/03/z7-GvRVcbW4.jpg /wp-content/uploads/2017/03/z7-GvRVcbW4.jpg /media/mc4wp-debug-log.php; do
+            curl -s -o /tmp/b -w "%{http_code} %{size_download}B %{content_type} $p %{redirect_url}\n" --max-time 30 "https://top-barbershop.com$p"
+          done
+          curl -s https://top-barbershop.com/place/portos/ > /tmp/p.html; grep -o '<title>[^<]*' /tmp/p.html; grep -o 'name="robots" content="[^"]*"' /tmp/p.html
+          IMG=$(grep -o '/img/[^"]*' /tmp/p.html | head -1); echo "img: $IMG"; curl -s -o /dev/null -w "thumb %{http_code} %{size_download} %{content_type}\n" -H 'Accept: image/avif,image/webp' "https://top-barbershop.com$IMG"
+          curl -s https://new.top-barbershop.com/ | grep -o 'name="robots" content="[^"]*"'
+          curl -s https://new.top-barbershop.com/robots.txt
+          curl -s -o /dev/null -w "www %{http_code} %{redirect_url}\n" https://www.top-barbershop.com/place/portos/
+          # время ответа
+          for p in / /location/russia/msk/ /place/portos/; do curl -s -o /dev/null -w "time $p %{time_total}s\n" https://top-barbershop.com$p; done
