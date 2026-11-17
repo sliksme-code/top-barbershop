@@ -1,5 +1,7 @@
 name: pg-export
 on: workflow_dispatch
+permissions:
+  contents: write
 jobs:
   export:
     runs-on: ubuntu-latest
@@ -10,14 +12,13 @@ jobs:
           HOST: ${{ secrets.VPS_HOST }}
         run: |
           mkdir -p ~/.ssh; echo "$KEY" > ~/.ssh/id; chmod 600 ~/.ssh/id
-          T="-t features -t locations -t metro -t chains -t collections -t barbershops -t barbershop_metro -t barbershop_collections -t reviews -t categories -t posts -t post_categories -t pages -t school_cities -t schools -t vacancy_cities -t vacancies"
+          T="-t features -t locations -t metro -t chains -t collections -t barbershops -t barbershop_metro -t barbershop_collections -t categories -t posts -t post_categories -t pages -t school_cities -t schools -t vacancy_cities -t vacancies"
           ssh -i ~/.ssh/id -o StrictHostKeyChecking=no deploy@$HOST "cd /opt/top-barbershop && set -a && . ./.env && docker compose exec -T postgres pg_dump -U \$POSTGRES_USER -d \$POSTGRES_DB --no-owner --no-acl $T" | gzip > catalog.sql.gz
           ssh -i ~/.ssh/id -o StrictHostKeyChecking=no deploy@$HOST "cd /opt/top-barbershop/legacy/uploads && find . -type f | sed 's#^\./##'" | gzip > uploads-list.txt.gz
+          ssh -i ~/.ssh/id -o StrictHostKeyChecking=no deploy@$HOST "cd /opt/top-barbershop && set -a && . ./.env && docker compose exec -T postgres psql -U \$POSTGRES_USER -d \$POSTGRES_DB -c \"copy (select id,barbershop_id,author_name,rating,pros,cons,content,status,created_at from reviews) to stdout with csv header\"" | gzip > reviews.csv.gz
           ls -la
-      - uses: actions/upload-artifact@v4
-        with:
-          name: catalog
-          path: |
-            catalog.sql.gz
-            uploads-list.txt.gz
-          retention-days: 2
+      - name: push to temp branch
+        run: |
+          git init -q x && cd x && mv ../*.gz . && git checkout -q -b data-export
+          git -c user.name=ci -c user.email=ci@local commit -qm export --allow-empty && git add . && git -c user.name=ci -c user.email=ci@local commit -qm data
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data-export
