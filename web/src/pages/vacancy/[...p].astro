@@ -1,0 +1,58 @@
+---
+import Base from '../../layouts/Base.astro';
+import Crumbs from '../../components/Crumbs.astro';
+import Simple from '../../components/Simple.astro';
+import { sql } from '../../lib/db';
+import { img } from '../../lib/img';
+import { breadcrumbLd } from '../../lib/seo';
+import { cleanHtml, strip, clip, phoneHref, ensureUrl } from '../../lib/text';
+const parts = (Astro.params.p || '').split('/').filter(Boolean);
+let city: any = null;
+if (parts[0] === 'vacancy-city' && parts[1]) { [city] = await sql`select * from vacancy_cities where slug = ${parts[1]}`; if (!city) return Astro.rewrite('/404/'); }
+else if (parts.length === 1) {
+  const [x] = await sql`select t.*, c.name city, c.slug city_slug from vacancies t left join vacancy_cities c on c.id = t.city_id where t.slug = ${parts[0]} and t.status = 'published'`;
+  if (!x) return Astro.rewrite('/404/');
+  Astro.locals.item = x;
+} else if (parts.length) return Astro.rewrite('/404/');
+const x: any = (Astro.locals as any).item;
+const items = x ? [] : await sql`select t.*, c.name city from vacancies t left join vacancy_cities c on c.id = t.city_id where t.status='published' ${city ? sql`and t.city_id = ${city.id}` : sql``} order by t.id desc`;
+const cities = x ? [] : await sql`select c.slug, c.name from vacancy_cities c where exists (select 1 from vacancies t where t.city_id = c.id and t.status='published') order by c.name`;
+const crumbs: [string, string?][] = [['Главная', '/'], ['Вакансии', x || city ? '/vacancy/' : undefined], ...(city ? [[city.name] as [string]] : []), ...(x ? [[x.title] as [string]] : [])];
+const facts: [string, string | null][] = x ? ('vacancy' === 'school'
+  ? [['Город', x.city], ['Адрес', x.address], ['Длительность', x.duration], ['Обучение с нуля', x.from_zero], ['Рассрочка / кредит', x.credit], ['Инструменты', x.tools]]
+  : [['Город', x.city], ['Барбершоп', x.barbershop_name], ['Адрес', x.address], ['График', x.schedule], ['Зарплата', x.salary]]) : [];
+---
+<Base title={x ? `${x.title} — ${'vacancy' === 'school' ? 'курсы барберов' : 'вакансия барбера'}${x.city ? ', ' + x.city : ''}` : city ? `Вакансии — ${city.name}` : 'Работа барбером — вакансии в барбершопах'}
+  description={x ? clip(strip(x.content) || x.title, 200) : 'Вакансии барберов и администраторов в барбершопах: зарплата, график, адреса и контакты работодателей.'} jsonLd={breadcrumbLd(crumbs)}>
+  <div class="wrap">
+    <Crumbs items={crumbs} />
+    {x ? (
+      <div class="sx">
+        <article>
+          <h1>{x.title}</h1>
+          {x.cover_image && <img class="sx-cover" src={img(x.cover_image, 1000, 0, 'fit')} alt={x.title} onerror="this.remove()" />}
+          <div class="prose" set:html={cleanHtml(x.content)} />
+        </article>
+        <aside class="panel">
+          <dl class="sx-dl">{facts.filter(([, v]) => v).map(([k, v]) => <><dt>{k}</dt><dd>{v === "on" ? "Да" : v}</dd></>)}</dl>
+          {x.phone && <a class="btn" href={phoneHref(x.phone)}>{x.phone}</a>}
+          {(x.site || x.barbershop_link) && <a class="btn ghost" href={ensureUrl(x.site || x.barbershop_link)} target="_blank" rel="nofollow noopener">Сайт</a>}
+        </aside>
+      </div>
+    ) : (
+      <>
+        <h1>{city ? `Вакансии — ${city.name}` : 'Вакансии барберов'}</h1>
+        {cities.length > 1 && <div class="chips" style="margin:6px 0 22px">{cities.map((c) => <a class="chip" href={`/vacancy/vacancy-city/${c.slug}/`}>{c.name}</a>)}</div>}
+        <Simple items={items} kind="vacancy" />
+        {items.length === 0 && <p class="muted">Пока пусто.</p>}
+      </>
+    )}
+  </div>
+</Base>
+<style>
+.sx{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:28px;align-items:start}
+.sx-cover{border-radius:var(--r);margin:8px 0 22px}
+.sx aside{display:grid;gap:10px;position:sticky;top:88px}
+.sx-dl{margin:0}.sx-dl dt{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:10px}.sx-dl dd{margin:0}
+@media (max-width:900px){.sx{grid-template-columns:1fr}.sx aside{position:static}}
+</style>

@@ -1,0 +1,64 @@
+---
+// Записи журнала и страницы WordPress жили в корне: /slug/
+import Base from '../layouts/Base.astro';
+import Crumbs from '../components/Crumbs.astro';
+import PostCard from '../components/PostCard.astro';
+import { sql } from '../lib/db';
+import { img } from '../lib/img';
+import { breadcrumbLd, abs } from '../lib/seo';
+import { cleanHtml, strip, clip, dateRu } from '../lib/text';
+
+const parts = (Astro.params.slug || '').split('/').filter(Boolean);
+if (!parts.length) return Astro.rewrite('/404/');
+// хвосты WordPress: /slug/amp/, /slug/feed/, /slug/2/, /slug/comment-page-1/ → на запись
+if (parts.length === 2 && /^(amp|feed|embed|trackback|\d+|comment-page-\d+)$/.test(parts[1])) return Astro.redirect(`/${parts[0]}/`, 301);
+if (parts.length !== 1) return Astro.rewrite('/404/');
+const slug = decodeURIComponent(parts[0]);
+if (slug === 'home') return Astro.redirect('/', 301);
+
+const DASHBOARD = ['login', 'register', 'add', 'edit', 'my', 'my-favorites', 'my-watchdogs', 'change-password', 'setup', 'invoices', 'transactions', 'payment', 'remove', 'logout', 'dobavit-vakansiyu'];
+const [post] = await sql`select p.*, (select json_agg(json_build_object('slug', c.slug, 'name', c.name)) from post_categories pc join categories c on c.id = pc.category_id where pc.post_id = p.id) cats from posts p where p.slug = ${slug} and p.status = 'published'`;
+const [pg] = post ? [] : await sql`select * from pages where slug = ${slug} and status = 'published'`;
+if (!post && !pg && !DASHBOARD.includes(slug)) return Astro.rewrite('/404/');
+
+let related: any[] = [];
+if (post) related = await sql`select slug, title, cover_image, excerpt, left(content,600) content, published_at from posts where status='published' and id <> ${post.id} order by abs(extract(epoch from published_at - ${post.published_at})) limit 3`;
+const it = post || pg;
+const isDash = !it || DASHBOARD.includes(slug);
+const title = isDash ? 'Личный кабинет — TOP BARBERSHOP' : it.seo_title || `${it.title} — TOP BARBERSHOP`;
+const description = isDash ? 'Личный кабинет владельца барбершопа на TOP BARBERSHOP.' : clip(it.seo_description || strip(it.excerpt) || strip(it.content) || it.title, 200);
+const crumbs: [string, string?][] = post ? [['Главная', '/'], ['Журнал', '/zhurnal/'], ...(post.cats?.[0] ? [[post.cats[0].name, `/category/${post.cats[0].slug}/`] as [string, string]] : []), [post.title]] : [['Главная', '/'], [isDash ? 'Личный кабинет' : it.title]];
+const ld: any[] = [breadcrumbLd(crumbs)];
+if (post) ld.push({ '@context': 'https://schema.org', '@type': 'BlogPosting', headline: post.title, datePublished: post.published_at, dateModified: post.updated_at || post.published_at, image: post.cover_image ? abs(post.cover_image) : undefined, mainEntityOfPage: abs(`/${post.slug}/`), author: { '@type': 'Organization', name: 'TOP BARBERSHOP' }, publisher: { '@type': 'Organization', name: 'TOP BARBERSHOP', logo: { '@type': 'ImageObject', url: abs('/favicon.svg') } } });
+---
+<Base {title} {description} noindex={isDash || it?.noindex} ogImage={post?.cover_image ? abs(img(post.cover_image, 1200, 630)) : undefined} jsonLd={ld}>
+  <div class="wrap">
+    <Crumbs items={crumbs} />
+    {isDash ? (
+      <section class="panel dash">
+        <h1>Личный кабинет</h1>
+        <p>Мы переехали на новую платформу, и личный кабинет владельцев сейчас обновляется. Ваш аккаунт и пароль сохранены — вход заработает в ближайшее время.</p>
+        <p>Нужно срочно обновить данные барбершопа или добавить новый? Напишите нам во <a href="https://vk.com/im?sel=510233" rel="noopener" target="_blank">ВКонтакте</a> — внесём изменения вручную.</p>
+        <a class="btn" href="/">На главную</a>
+      </section>
+    ) : (
+      <article class="art">
+        {post && <p class="eyebrow">{post.cats?.[0]?.name || 'Журнал'} · {dateRu(post.published_at)}</p>}
+        <h1>{it.title}</h1>
+        {post?.cover_image && !String(post.content || '').includes(String(post.cover_image).split('/').pop()) && (
+          <img class="art-cover" src={img(post.cover_image, 1200, 0, 'fit')} alt={post.title} loading="eager" onerror="this.remove()" />
+        )}
+        <div class="prose" set:html={cleanHtml(it.content)} />
+      </article>
+    )}
+    {related.length > 0 && (
+      <section class="section"><div class="section-head"><h2>Читайте также</h2></div><div class="grid">{related.map((p) => <PostCard p={p} />)}</div></section>
+    )}
+  </div>
+</Base>
+<style>
+.art{max-width:800px}
+.art h1{margin-top:6px}
+.art-cover{border-radius:var(--r);margin:10px 0 26px;width:100%}
+.dash{max-width:720px;margin:20px 0}
+</style>

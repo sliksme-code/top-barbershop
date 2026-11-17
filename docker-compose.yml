@@ -17,6 +17,7 @@ services:
     volumes:
       - ./deploy:/etc/caddy/deploy:ro   # папка, а не файлы: иначе после обновления Caddy видит старую версию
       - media:/srv/media:ro
+      - ./legacy/uploads:/srv/uploads:ro   # фото старого сайта (/media/... = /wp-content/uploads/...)
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [web, directus]
@@ -28,8 +29,11 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 4321
-      SITE_URL: https://${SITE_DOMAIN}
-      SITE_ENV: ${SITE_ENV:-staging}
+      SITE_URL: https://${PROD_DOMAIN:-top-barbershop.com}
+      SITE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      IMGPROXY_KEY: ${IMGPROXY_KEY}
+      IMGPROXY_SALT: ${IMGPROXY_SALT}
       DIRECTUS_URL: http://directus:8055
       DIRECTUS_TOKEN: ${DIRECTUS_WEB_TOKEN}
       MEILI_URL: http://meilisearch:7700
@@ -37,7 +41,7 @@ services:
       YANDEX_MAPS_KEY: ${YANDEX_MAPS_KEY}
       SMARTCAPTCHA_CLIENT_KEY: ${SMARTCAPTCHA_CLIENT_KEY}
       SMARTCAPTCHA_SERVER_KEY: ${SMARTCAPTCHA_SERVER_KEY}
-    depends_on: [directus, meilisearch]
+    depends_on: [postgres, directus, meilisearch]
 
   directus:
     image: directus/directus:11
@@ -119,7 +123,8 @@ services:
       IMGPROXY_AUTO_AVIF: "true"
       IMGPROXY_KEY: ${IMGPROXY_KEY}
       IMGPROXY_SALT: ${IMGPROXY_SALT}
-    volumes: [media:/srv/media:ro]
+      IMGPROXY_TTL: "31536000"
+    volumes: ["./legacy/uploads:/srv/media:ro"]
 
 volumes:
   pgdata:

@@ -1,0 +1,20 @@
+---
+import { img } from '../lib/img';
+import { dateRu, strip, clip } from '../lib/text';
+const { p } = Astro.props as { p: { slug: string; title: string; cover_image: string | null; excerpt?: string | null; content?: string | null; published_at: Date | null } };
+---
+<article class="pc">
+  <a href={`/${p.slug}/`} class="pc-img"><img src={img(p.cover_image, 600, 380)} alt={p.title} width="600" height="380" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='/placeholder.svg'" /></a>
+  <div class="pc-b">
+    <p class="muted pc-d">{dateRu(p.published_at)}</p>
+    <h3><a href={`/${p.slug}/`}>{p.title}</a></h3>
+    <p class="pc-e">{clip(strip(p.excerpt || p.content), 140)}</p>
+  </div>
+</article>
+<style>
+.pc{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.pc-img{display:block;aspect-ratio:600/380;background:#2a2520}.pc-img img{width:100%;height:100%;object-fit:cover}
+.pc-b{padding:14px 16px 18px}.pc-d{font-size:13px;margin:0 0 4px}
+.pc h3{font-size:18px;margin:0 0 6px}.pc h3 a{text-decoration:none}.pc h3 a:hover{color:var(--red)}
+.pc-e{font-size:15px;color:var(--muted);margin:0}
+</style>

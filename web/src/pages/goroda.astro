@@ -1,0 +1,27 @@
+---
+import Base from '../layouts/Base.astro';
+import Crumbs from '../components/Crumbs.astro';
+import { locationCounts } from '../lib/catalog';
+import { breadcrumbLd } from '../lib/seo';
+import { shops } from '../lib/text';
+const all = await locationCounts();
+const tot = (p: string) => all.filter((x) => x.path === p || x.path.startsWith(p + '/')).reduce((a, x) => a + x.n, 0);
+const countries = all.filter((x) => !x.parent_id).map((c) => ({ ...c, t: tot(c.path), kids: all.filter((x) => x.parent_id === c.id).map((k) => ({ ...k, t: tot(k.path) })).filter((k) => k.t > 0).sort((a, b) => a.name.localeCompare(b.name, 'ru')) })).filter((c) => c.t > 0).sort((a, b) => b.t - a.t);
+const crumbs: [string, string?][] = [['Главная', '/'], ['Барбершопы по городам']];
+---
+<Base title="Барбершопы по городам России и СНГ — TOP BARBERSHOP" description="Список городов, где есть барбершопы: Москва, Санкт-Петербург, Краснодар, Казань, Екатеринбург и ещё десятки городов России, Украины, Беларуси и Казахстана." jsonLd={breadcrumbLd(crumbs)}>
+  <div class="wrap">
+    <Crumbs items={crumbs} />
+    <h1>Барбершопы по городам</h1>
+    {countries.map((c) => (
+      <section class="ctry">
+        <h2><a href={`/location/${c.path}/`}>{c.name}</a> <span class="muted">{shops(c.t)}</span></h2>
+        <ul class="ctry-l">{c.kids.map((k) => <li><a href={`/location/${k.path}/`}>{k.name}</a> <span class="muted">{k.t}</span></li>)}</ul>
+      </section>
+    ))}
+  </div>
+</Base>
+<style>
+.ctry{margin:28px 0}.ctry h2 a{text-decoration:none}.ctry h2 .muted{font-size:16px;font-weight:500}
+.ctry-l{columns:4 200px;list-style:none;padding:0;margin:0}.ctry-l li{padding:4px 0;break-inside:avoid}.ctry-l a{text-decoration:none}.ctry-l a:hover{color:var(--red)}
+</style>

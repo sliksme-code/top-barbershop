@@ -1,0 +1,16 @@
+---
+import Listing from '../../components/Listing.astro';
+import { sql } from '../../lib/db';
+import { listShops, mapPoints, splitPage } from '../../lib/catalog';
+import { shops, clip, strip, cleanHtml } from '../../lib/text';
+const { parts, page } = splitPage(Astro.params.p);
+if (parts.length !== 1) return Astro.rewrite('/404/');
+const [c] = await sql`select * from collections where slug = ${parts[0]}`;
+if (!c) return Astro.rewrite('/404/');
+const where = sql`b.id in (select barbershop_id from barbershop_collections where collection_id = ${c.id})`;
+const data = await listShops(where, page);
+const points = page === 1 ? await mapPoints(where) : [];
+---
+<Listing h1={c.name} title={`${c.name} — подборка TOP BARBERSHOP`}
+  description={clip(strip(c.description) || `${c.name}: ${shops(data.total)} с адресами, ценами, фото и отзывами.`, 200)}
+  crumbs={[['Главная', '/'], ['Подборки'], [c.name]]} base={`/collection/${c.slug}/`} {page} {data} {points} intro={cleanHtml(c.description)} eyebrow="Подборка" />

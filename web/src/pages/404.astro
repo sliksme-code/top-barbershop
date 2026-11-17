@@ -1,6 +1,14 @@
 ---
 import Base from '../layouts/Base.astro';
+Astro.response.status = 404;
 ---
-<Base title="Страница не найдена – TOP BARBERSHOP" noindex>
-  <main><h1>Страница не найдена</h1><p><a href="/">На главную</a> · <a href="/listings/">Все барбершопы</a></p></main>
+<Base title="Страница не найдена — TOP BARBERSHOP" description="Такой страницы нет. Посмотрите каталог барбершопов или воспользуйтесь поиском." noindex>
+  <div class="wrap nf">
+    <p class="eyebrow">Ошибка 404</p>
+    <h1>Страница не найдена</h1>
+    <p class="muted">Возможно, барбершоп закрылся или страница переехала. Попробуйте найти нужное:</p>
+    <form action="/search/" method="get" class="nf-f"><input name="q" class="field" placeholder="Название, улица или метро" aria-label="Поиск" /><button class="btn">Найти</button></form>
+    <p><a class="btn ghost sm" href="/">На главную</a> <a class="btn ghost sm" href="/listings/">Все барбершопы</a> <a class="btn ghost sm" href="/goroda/">Города</a></p>
+  </div>
 </Base>
+<style>.nf{padding:60px 0}.nf-f{display:flex;gap:10px;max-width:560px;margin:20px 0}.nf-f .field{flex:1;min-width:0}</style>

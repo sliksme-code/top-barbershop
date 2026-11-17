@@ -1,0 +1,17 @@
+---
+import Base from '../layouts/Base.astro';
+import Crumbs from './Crumbs.astro';
+import PostCard from './PostCard.astro';
+import Pager from './Pager.astro';
+import { breadcrumbLd } from '../lib/seo';
+const { h1, title, description, crumbs, base, page, posts, pages, cats } = Astro.props;
+---
+<Base title={page > 1 ? `${title} — страница ${page}` : title} {description} canonical={new URL(page > 1 ? `${base}page/${page}/` : base, Astro.site).href} jsonLd={breadcrumbLd(crumbs)}>
+  <div class="wrap">
+    <Crumbs items={crumbs} />
+    <h1>{h1}</h1>
+    <div class="chips" style="margin:6px 0 24px"><a class="chip" href="/zhurnal/">Все статьи</a>{cats.map((c: any) => <a class="chip" href={`/category/${c.slug}/`}>{c.name}</a>)}</div>
+    <div class="grid">{posts.map((p: any) => <PostCard p={p} />)}</div>
+    <Pager {base} {page} {pages} />
+  </div>
+</Base>

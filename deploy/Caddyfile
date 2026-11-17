@@ -9,22 +9,49 @@
 	reverse_proxy directus:8055
 }
 
-# Тестовая версия нового сайта
-{$SITE_DOMAIN} {
+# Боевой домен: новый сайт (Astro + Postgres). Старый WordPress отключён.
+(newsite) {
 	encode zstd gzip
 	import /etc/caddy/deploy/redirects.caddy
-	handle /media/* {
-		root * /srv
-		header Cache-Control "public, max-age=31536000, immutable"
-		file_server
+	handle_path /media/* {
+		root * /srv/uploads
+		# служебные файлы, случайно попавшие в uploads, не отдаём
+		@priv path_regexp priv (\.php$|^/(iw-backup|wpallexport|wpallimport)/|mc4wp)
+		handle @priv {
+			respond 404
+		}
+		handle {
+			header Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
 	}
-	handle /logos/* {
-		root * /srv/media
-		file_server
+	handle_path /wp-content/uploads/* {
+		root * /srv/uploads
+		# служебные файлы, случайно попавшие в uploads, не отдаём
+		@priv path_regexp priv (\.php$|^/(iw-backup|wpallexport|wpallimport)/|mc4wp)
+		handle @priv {
+			respond 404
+		}
+		handle {
+			header Cache-Control "public, max-age=31536000, immutable"
+			file_server
+		}
 	}
 	handle_path /img/* {
+		header Cache-Control "public, max-age=31536000, immutable"
 		reverse_proxy imgproxy:8080
 	}
+	handle /_astro/* {
+		header Cache-Control "public, max-age=31536000, immutable"
+		reverse_proxy web:4321
+	}
+	redir /feed /feed/ 301
+	rewrite /feed/ /feed.xml
+	redir /sitemap_index.xml /sitemap.xml 301
+	redir /sitemap-index.xml /sitemap.xml 301
+	redir /post-sitemap.xml /sitemap.xml 301
+	redir /page-sitemap.xml /sitemap.xml 301
+	redir /barbershop-sitemap.xml /sitemap.xml 301
 	handle {
 		reverse_proxy web:4321
 	}
@@ -33,52 +60,23 @@
 		X-Content-Type-Options nosniff
 		-Server
 	}
-}
-
-# Боевой домен. На время переезда: разделы, готовые на новом стеке, отдаёт Astro,
-# всё остальное — старый WordPress через технический адрес хостинга.
-{$PROD_DOMAIN} {
-	encode zstd gzip
-	import /etc/caddy/deploy/redirects.caddy
-	import /etc/caddy/deploy/prod-routes.caddy
-
-	handle {
-		replace {
-			"http://{$LEGACY_HOST}" "https://{$PROD_DOMAIN}"
-			"https://{$LEGACY_HOST}" "https://{$PROD_DOMAIN}"
-			"http:\/\/{$LEGACY_HOST}" "https:\/\/{$PROD_DOMAIN}"
-			"https:\/\/{$LEGACY_HOST}" "https:\/\/{$PROD_DOMAIN}"
-			"{$LEGACY_HOST}" "{$PROD_DOMAIN}"
-			"http://{$PROD_DOMAIN}" "https://{$PROD_DOMAIN}"
-		}
-		reverse_proxy https://{$LEGACY_HOST} {
-			header_up Host {$LEGACY_HOST}
-			header_up -Accept-Encoding
-			# обходим JS-проверку cookie хостинга: роботы получают настоящие страницы
-			header_up Cookie "realauth=SvBD85dINu3; {http.request.header.Cookie}"
-			header_up X-Forwarded-Host {$PROD_DOMAIN}
-			header_down Location "{$LEGACY_HOST}" "{$PROD_DOMAIN}"
-			header_down Location "http://{$PROD_DOMAIN}" "https://{$PROD_DOMAIN}"
-			transport http {
-				tls_server_name {$LEGACY_HOST}
-				dial_timeout 5s
-			}
-		}
-	}
-	header {
-		Strict-Transport-Security "max-age=31536000"
-		-Server
-	}
-	# старый хостинг недоступен → 503 + Retry-After вместо 502 (поисковики не выкидывают страницы)
 	handle_errors 502 503 504 {
-		header Retry-After 3600
-		header Content-Type "text/html; charset=utf-8"
+		header Retry-After 120
 		root * /etc/caddy/deploy
 		rewrite * /maintenance.html
 		file_server {
 			status 503
 		}
 	}
+}
+
+{$PROD_DOMAIN} {
+	import newsite
+}
+
+# Тестовый домен — тот же сайт, но noindex (решает приложение по имени хоста)
+{$SITE_DOMAIN} {
+	import newsite
 }
 
 www.{$PROD_DOMAIN} {

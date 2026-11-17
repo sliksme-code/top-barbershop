@@ -1,0 +1,202 @@
+---
+import Base from '../../layouts/Base.astro';
+import Crumbs from '../../components/Crumbs.astro';
+import ShopCard from '../../components/ShopCard.astro';
+import YMap from '../../components/YMap.astro';
+import { sql } from '../../lib/db';
+import { featureLabels, type Card } from '../../lib/catalog';
+import { img, rel } from '../../lib/img';
+import { breadcrumbLd, abs } from '../../lib/seo';
+import { cleanHtml, strip, clip, rub, phoneHref, ensureUrl, dateRu, plural } from '../../lib/text';
+import { site } from '../../data/site';
+
+const parts = (Astro.params.p || '').split('/').filter(Boolean);
+if (parts.length === 0) return Astro.redirect('/listings/', 301);
+if (parts.length > 1) return Astro.redirect(`/place/${parts[0]}/`, 301); // старые /place/slug/2/, вложения, ленты
+const slug = parts[0];
+const [s] = await sql`select b.*, b.rating::float as rating_f, l.name as city, l.path as city_path, l.parent_id as city_parent,
+  c.name as chain_name, c.slug as chain_slug
+  from barbershops b left join locations l on l.id = b.location_id left join chains c on c.id = b.chain_id
+  where b.slug = ${slug} and b.status = 'published'`;
+if (!s) return Astro.rewrite('/404/');
+
+const [metros, colls, reviews, labels, country] = await Promise.all([
+  sql`select m.slug, m.name from barbershop_metro bm join metro m on m.id = bm.metro_id where bm.barbershop_id = ${s.id} order by m.name`,
+  sql`select c.slug, c.name from barbershop_collections bc join collections c on c.id = bc.collection_id where bc.barbershop_id = ${s.id}`,
+  sql`select author_name, rating, pros, cons, content, created_at from reviews where barbershop_id = ${s.id} and status = 'published' order by created_at desc`,
+  featureLabels(),
+  s.city_parent ? sql`select name, path from locations where id = ${s.city_parent}`.then((r) => r[0]) : Promise.resolve(null),
+]);
+const near: Card[] = s.lat && s.lng
+  ? await sql`select b.id, b.slug, b.title, coalesce(b.cover_image, b.gallery->>0) as cover, b.rating::float as rating, coalesce(b.reviews_count,0) as reviews_count,
+      coalesce(b.closed,false) as closed, coalesce(b.featured,false) as featured, b.address, b.services->>'strizh' as price, l.name as city, l.path as city_path, b.lat, b.lng,
+      (select string_agg(m.name, ', ') from barbershop_metro bm join metro m on m.id = bm.metro_id where bm.barbershop_id = b.id) as metro
+      from barbershops b left join locations l on l.id = b.location_id
+      where b.status = 'published' and b.id <> ${s.id} and b.lat is not null and not coalesce(b.closed,false)
+      order by (b.lat - ${s.lat})^2 + ((b.lng - ${s.lng}) * cos(radians(${s.lat})))^2 limit 4`
+  : [];
+
+const gallery: string[] = [...new Set([s.cover_image, ...((s.gallery as string[]) || [])].filter((x) => rel(x)))];
+const services = Object.entries((s.services || {}) as Record<string, unknown>).filter(([, v]) => v !== null && v !== '' && v !== 0)
+  .map(([k, v]) => ({ label: labels[k]?.label || k, price: v })).sort((a, b) => Number(a.price) - Number(b.price));
+const amenities = ((s.amenities || []) as string[]).map((k) => labels[k]?.label).filter(Boolean);
+const DAYS = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+const hours = Array.isArray(s.opening_hours) ? (s.opening_hours as any[]).filter((h) => h && h.day) : [];
+const sameHours = hours.length === 7 && hours.every((h) => h.from === hours[0].from && h.to === hours[0].to);
+const rating = s.rating_f ? Math.round(s.rating_f * 10) / 10 : null;
+const metroNames = metros.map((m) => m.name.replace(/\s*\((Мск|СПб|Спб)\)/, ''));
+const descText = strip(s.description);
+const strizh = s.services?.strizh ? rub(s.services.strizh) : null;
+const title = s.seo_title || `${s.title} — барбершоп${s.city ? ' в ' + s.city : ''}${metroNames[0] ? ', м. ' + metroNames[0] : ''}: цены, отзывы, запись`;
+const description = clip(s.seo_description || [`${s.title} — барбершоп${s.address ? ' по адресу ' + s.address : ''}${s.city ? ', ' + s.city : ''}.`, strizh ? `Мужская стрижка — ${strizh}.` : '', descText].filter(Boolean).join(' '), 200);
+const crumbs: [string, string?][] = [['Главная', '/']];
+if (country) crumbs.push([country.name, `/location/${country.path}/`]);
+if (s.city) crumbs.push([s.city, `/location/${s.city_path}/`]);
+crumbs.push([s.title]);
+
+const phone = phoneHref(s.phone);
+const website = ensureUrl(s.website);
+const booking = ensureUrl(s.booking_url) || ensureUrl(s.booking_url_alt);
+const socials = [['Instagram*', ensureUrl(s.instagram)], ['ВКонтакте', ensureUrl(s.vk)], ['YouTube', ensureUrl(s.youtube)]].filter(([, u]) => u) as [string, string][];
+const ld: any = {
+  '@context': 'https://schema.org', '@type': 'HairSalon', name: s.title, url: abs(`/place/${s.slug}/`),
+  image: gallery.slice(0, 5).map((g) => abs(rel(g)!)), description: clip(descText, 300) || undefined, telephone: s.phone || undefined,
+  address: s.address ? { '@type': 'PostalAddress', streetAddress: s.address, addressLocality: s.city || undefined, addressCountry: country?.name || undefined } : undefined,
+  geo: s.lat && s.lng ? { '@type': 'GeoCoordinates', latitude: s.lat, longitude: s.lng } : undefined,
+  priceRange: strizh ? `от ${strizh}` : undefined,
+  openingHoursSpecification: hours.length ? hours.map((h) => ({ '@type': 'OpeningHoursSpecification', dayOfWeek: 'https://schema.org/' + ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][h.day - 1], opens: h.from, closes: h.to })) : undefined,
+};
+if (rating && reviews.length) {
+  ld.aggregateRating = { '@type': 'AggregateRating', ratingValue: rating, reviewCount: reviews.length, bestRating: 5, worstRating: 1 };
+  ld.review = reviews.slice(0, 5).filter((r) => r.rating).map((r) => ({ '@type': 'Review', author: { '@type': 'Person', name: r.author_name || 'Гость' }, reviewRating: { '@type': 'Rating', ratingValue: r.rating, bestRating: 5 }, reviewBody: clip(strip([r.pros, r.cons, r.content].filter(Boolean).join(' ')), 500), datePublished: r.created_at ? new Date(r.created_at).toISOString().slice(0, 10) : undefined }));
+}
+const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
+---
+<Base {title} {description} ogImage={og} jsonLd={[ld, breadcrumbLd(crumbs)]}>
+  <div class="wrap">
+    <Crumbs items={crumbs} />
+    <header class="pl-head">
+      <div class="pl-title">
+        {s.closed && <span class="badge closed">Закрыт</span>}
+        <h1>{s.title}</h1>
+        <p class="pl-sub">
+          {s.chain_name && /\p{L}/u.test(s.chain_name) && <a href={`/all/${s.chain_slug}/`} class="chip">Сеть {s.chain_name}</a>}
+          {rating ? <span class="chip"><span class="stars">★</span> {rating.toFixed(1)} · {reviews.length || s.reviews_count} {plural(reviews.length || s.reviews_count || 0, 'отзыв', 'отзыва', 'отзывов')}</span> : null}
+          {s.city && <a class="chip" href={`/location/${s.city_path}/`}>{s.city}</a>}
+          {metros.map((m, i) => <a class="chip" href={`/metro/${m.slug}/`}>м. {metroNames[i]}</a>)}
+        </p>
+      </div>
+      {!s.closed && (
+        <div class="pl-actions">
+          {booking && <a class="btn brass" href={booking} target="_blank" rel="nofollow noopener" data-goal={site.goals.booking}>Записаться онлайн</a>}
+          {phone && <a class="btn" href={phone} data-goal={site.goals.callShop}>{s.phone}</a>}
+        </div>
+      )}
+    </header>
+    {s.closed && <p class="pl-closed panel">Этот барбершоп закрыт. Посмотрите <a href={s.city_path ? `/location/${s.city_path}/` : '/listings/'}>другие барбершопы{s.city ? ' в городе ' + s.city : ''}</a> или ближайшие ниже.</p>}
+
+    {gallery.length > 0 && (
+      <div class="pl-gal" aria-label="Фотографии">
+        {gallery.map((g, i) => (
+          <a href={rel(g)} target="_blank" class={i === 0 ? 'big' : ''}>
+            <img src={img(g, i === 0 ? 1000 : 500, i === 0 ? 667 : 333)} alt={`${s.title} — фото ${i + 1}`} width={i === 0 ? 1000 : 500} height={i === 0 ? 667 : 333} loading={i < 3 ? 'eager' : 'lazy'} decoding="async" onerror="this.closest('a').remove()" />
+          </a>
+        ))}
+      </div>
+    )}
+
+    <div class="pl-grid">
+      <div class="pl-main">
+        {services.length > 0 && (
+          <section class="panel">
+            <h2>Цены на услуги</h2>
+            <ul class="pl-prices">{services.map((x) => <li><span>{x.label}</span><b>{rub(x.price)}</b></li>)}</ul>
+            <p class="muted pl-note">Цены указаны владельцем барбершопа и могли измениться — уточняйте при записи.</p>
+          </section>
+        )}
+        {s.description && (
+          <section class="panel">
+            <h2>О барбершопе</h2>
+            <div class="prose" set:html={cleanHtml(s.description)} />
+          </section>
+        )}
+        {amenities.length > 0 && (
+          <section class="panel">
+            <h2>Удобства</h2>
+            <ul class="pl-am">{amenities.map((a) => <li>✓ {a}</li>)}</ul>
+          </section>
+        )}
+        <section class="panel" id="reviews">
+          <h2>Отзывы{reviews.length ? ` (${reviews.length})` : ''}</h2>
+          {reviews.length === 0 && <p class="muted">Пока никто не оставил отзыв об этом барбершопе.</p>}
+          {reviews.map((r) => (
+            <article class="rv">
+              <p class="rv-h"><b>{r.author_name || 'Гость'}</b>{r.rating && <span class="stars"> {'★'.repeat(r.rating)}<span style="opacity:.25">{'★'.repeat(5 - r.rating)}</span></span>}<span class="muted"> · {dateRu(r.created_at)}</span></p>
+              {r.pros && <p><b>Понравилось:</b> {r.pros}</p>}
+              {r.cons && <p><b>Не понравилось:</b> {r.cons}</p>}
+              {r.content && <div set:html={cleanHtml(/<p/.test(r.content) ? r.content : `<p>${r.content}</p>`)} />}
+            </article>
+          ))}
+        </section>
+      </div>
+      <aside class="pl-side">
+        <div class="panel">
+          <h2 class="h3">Контакты</h2>
+          <dl class="pl-dl">
+            {s.address && <><dt>Адрес</dt><dd>{s.address}{s.city ? `, ${s.city}` : ''}</dd></>}
+            {metroNames.length > 0 && <><dt>Метро</dt><dd>{metroNames.join(', ')}</dd></>}
+            {phone && !s.closed && <><dt>Телефон</dt><dd><a href={phone} data-goal={site.goals.callShop}>{s.phone}</a></dd></>}
+            {website && <><dt>Сайт</dt><dd><a href={website} target="_blank" rel="nofollow noopener" data-goal={site.goals.siteClick}>{website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></dd></>}
+            {hours.length > 0 && <><dt>Часы работы</dt><dd>{sameHours ? <>Ежедневно {hours[0].from}–{hours[0].to}</> : <ul class="pl-hours">{hours.map((h) => <li><span>{DAYS[h.day - 1]}</span> {h.from && h.to ? `${h.from}–${h.to}` : 'выходной'}</li>)}</ul>}</dd></>}
+          </dl>
+          {socials.length > 0 && <div class="chips">{socials.map(([n, u]) => <a class="chip" href={u} target="_blank" rel="nofollow noopener">{n}</a>)}</div>}
+          {socials.some(([n]) => n.startsWith('Instagram')) && <p class="muted pl-note">* Instagram принадлежит компании Meta, деятельность которой запрещена в России.</p>}
+          {!s.closed && booking && <a class="btn brass pl-wide" href={booking} target="_blank" rel="nofollow noopener" data-goal={site.goals.booking}>Записаться онлайн</a>}
+        </div>
+        {s.lat && s.lng && <YMap points={[{ title: s.title, lat: s.lat, lng: s.lng, address: s.address }]} zoom={15} height={300} />}
+        {colls.length > 0 && <div class="panel"><h2 class="h3">В подборках</h2><div class="chips">{colls.map((c) => <a class="chip" href={`/collection/${c.slug}/`}>{c.name}</a>)}</div></div>}
+        <p class="muted pl-note">Вы владелец? <a href="/owners/">Обновите информацию о барбершопе</a>.</p>
+      </aside>
+    </div>
+
+    {near.length > 0 && (
+      <section class="section">
+        <div class="section-head"><h2>Барбершопы рядом</h2>{s.city_path && <a href={`/location/${s.city_path}/`} class="btn ghost sm">Все в городе {s.city}</a>}</div>
+        <div class="grid">{near.map((n) => <ShopCard s={n} />)}</div>
+      </section>
+    )}
+  </div>
+</Base>
+<style>
+.pl-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin:6px 0 20px;flex-wrap:wrap}
+.pl-title{min-width:0;flex:1 1 420px}
+.pl-title h1{margin:6px 0 10px}
+.pl-sub{display:flex;flex-wrap:wrap;gap:8px;margin:0}
+.pl-actions{display:flex;gap:10px;flex-wrap:wrap}
+.pl-closed{margin-bottom:20px;border-color:var(--red)}
+.pl-gal:not(:has(a)){display:none}
+.pl-gal{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(220px,1fr);grid-template-rows:repeat(2,minmax(0,1fr));gap:8px;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:var(--r);margin-bottom:28px;height:min(440px,62vw)}
+.pl-gal a{scroll-snap-align:start;overflow:hidden;border-radius:10px;background:#2a2520;min-width:0}
+.pl-gal a.big{grid-row:span 2;grid-column:span 2;min-width:min(560px,86vw)}
+.pl-gal img{width:100%;height:100%;object-fit:cover;transition:transform .3s}
+.pl-gal a:hover img{transform:scale(1.03)}
+.pl-grid{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:24px;align-items:start}
+.pl-main,.pl-side{display:grid;gap:20px;min-width:0}
+.pl-side{position:sticky;top:88px}
+.h3{font-size:20px}
+.pl-prices{list-style:none;margin:0;padding:0}
+.pl-prices li{display:flex;justify-content:space-between;gap:16px;padding:11px 0;border-bottom:1px dashed var(--line)}
+.pl-prices li span{min-width:0}
+.pl-prices b{white-space:nowrap}
+.pl-note{font-size:13px;margin:12px 0 0}
+.pl-am{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.pl-dl{margin:0 0 14px;display:grid;gap:4px}
+.pl-dl dt{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:10px}
+.pl-dl dd{margin:0;overflow-wrap:anywhere}
+.pl-hours{list-style:none;margin:0;padding:0}.pl-hours span{display:inline-block;width:30px;color:var(--muted)}
+.pl-wide{width:100%;margin-top:16px}
+.rv{border-top:1px solid var(--line);padding:16px 0}.rv:first-of-type{border-top:0}
+.rv-h{margin-bottom:6px}
+@media (max-width:960px){.pl-grid{grid-template-columns:1fr}.pl-side{position:static}}
+@media (max-width:640px){.pl-gal{grid-template-rows:1fr;height:260px;grid-auto-columns:80%}.pl-gal a.big{grid-row:auto;grid-column:auto;min-width:0}.pl-actions{width:100%}.pl-actions .btn{flex:1}}
+</style>

@@ -1,0 +1,41 @@
+---
+import Logo from './Logo.astro';
+import { site } from '../data/site';
+const year = new Date().getFullYear();
+---
+<footer class="ftr">
+  <div class="wrap ftr-grid">
+    <div>
+      <Logo />
+      <p class="ftr-about">Каталог барбершопов России и СНГ с 2016 года: адреса, цены, фото, отзывы и онлайн-запись. Только мужские парикмахерские — никаких женских салонов.</p>
+      <a href={site.social.vk} rel="noopener" target="_blank" class="chip">ВКонтакте</a>
+    </div>
+    <div>
+      <p class="ftr-h">Города</p>
+      <a href="/location/russia/msk/">Москва</a><a href="/location/russia/spb/">Санкт-Петербург</a><a href="/location/russia/krasnodar/">Краснодар</a><a href="/location/russia/kzn/">Казань</a><a href="/goroda/">Все города</a>
+    </div>
+    <div>
+      <p class="ftr-h">Каталог</p>
+      <a href="/listings/">Все барбершопы</a><a href="/samye-krupnye-seti-barbershopov/">Сети барбершопов</a><a href="/school/">Школы барберов</a><a href="/vacancy/">Вакансии</a><a href="/zhurnal/">Журнал</a>
+    </div>
+    <div>
+      <p class="ftr-h">Проект</p>
+      {site.footer.map((l) => <a href={l.href}>{l.label}</a>)}
+      <a href="https://awards.top-barbershop.com/">Премия</a>
+    </div>
+  </div>
+  <div class="wrap ftr-bottom">© 2016–{year} TOP BARBERSHOP. Информация на сайте не является публичной офертой.</div>
+</footer>
+<style>
+.ftr{background:var(--ink);color:#cfc6b9;margin-top:64px;padding:48px 0 24px}
+.ftr-grid{display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:32px}
+.ftr-grid>*{min-width:0}
+.ftr-grid a:not(.chip){display:block;text-decoration:none;padding:4px 0;color:#cfc6b9}
+.ftr-grid a:not(.chip):hover{color:var(--brass2)}
+.ftr-h{color:#fff;font-weight:700;margin-bottom:8px}
+.ftr-about{margin:16px 0;max-width:360px;font-size:15px}
+.ftr .chip{background:transparent;color:#fff;border-color:#3a332b}
+.ftr-bottom{border-top:1px solid #2c2620;margin-top:32px;padding-top:18px;font-size:13px;color:#8d8478}
+@media (max-width:820px){.ftr-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:480px){.ftr-grid{grid-template-columns:1fr}}
+</style>

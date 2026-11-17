@@ -1,0 +1,12 @@
+---
+import Journal from '../../components/Journal.astro';
+import { sql } from '../../lib/db';
+import { splitPage } from '../../lib/catalog';
+import { listPosts, usedCats } from '../../lib/journal';
+const { parts, page } = splitPage(Astro.params.p);
+if (parts.length) return Astro.rewrite('/404/');
+const { posts, pages } = await listPosts(sql`true`, page);
+if (page > pages) return Astro.rewrite('/404/');
+const cats = await usedCats();
+---
+<Journal h1="Журнал о мужских стрижках и барбершопах" title="Журнал TOP BARBERSHOP — стрижки, бритьё, уход за бородой" description="Статьи о мужских стрижках, бритье, уходе за бородой и мужской косметике. Интервью с барберами и новости барбершопов." crumbs={[['Главная', '/'], ['Журнал']]} base="/zhurnal/" {page} {posts} {pages} {cats} />

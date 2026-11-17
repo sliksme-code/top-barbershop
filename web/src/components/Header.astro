@@ -1,0 +1,74 @@
+---
+import Logo from './Logo.astro';
+const cities = [
+  ['/location/russia/msk/', 'Москва'], ['/location/russia/spb/', 'Санкт-Петербург'], ['/location/russia/krasnodar/', 'Краснодар'],
+  ['/location/russia/kzn/', 'Казань'], ['/location/russia/ekb/', 'Екатеринбург'], ['/location/russia/nsk/', 'Новосибирск'],
+  ['/location/ukraina/kiev/', 'Киев'],
+];
+const q = Astro.url.searchParams.get('q') ?? '';
+---
+<header class="hdr">
+  <div class="wrap hdr-in">
+    <a href="/" class="hdr-logo" aria-label="TOP BARBERSHOP — на главную"><Logo /></a>
+    <nav class="hdr-nav" aria-label="Главное меню">
+      <details class="dd">
+        <summary>Города</summary>
+        <div class="dd-menu">
+          {cities.map(([h, l]) => <a href={h}>{l}</a>)}
+          <a href="/goroda/" class="all">Все города →</a>
+        </div>
+      </details>
+      <a href="/listings/">Все барбершопы</a>
+      <a href="/samye-krupnye-seti-barbershopov/">Сети</a>
+      <a href="/zhurnal/">Журнал</a>
+      <a href="/school/">Школы</a>
+      <a href="/vacancy/">Вакансии</a>
+    </nav>
+    <form action="/search/" method="get" class="hdr-search" role="search">
+      <label class="sr" for="hq">Поиск барбершопа</label>
+      <input id="hq" name="q" value={q} placeholder="Барбершоп, улица, метро" class="field" />
+    </form>
+    <a href="/owners/" class="btn brass sm hdr-cta">Добавить барбершоп</a>
+    <details class="burger">
+      <summary aria-label="Меню"><span></span><span></span><span></span></summary>
+      <div class="burger-menu">
+        <form action="/search/" method="get" role="search"><input name="q" value={q} placeholder="Поиск барбершопа" class="field" aria-label="Поиск барбершопа" /></form>
+        <a href="/listings/">Все барбершопы</a>
+        {cities.map(([h, l]) => <a href={h}>{l}</a>)}
+        <a href="/goroda/">Все города</a>
+        <a href="/samye-krupnye-seti-barbershopov/">Сети барбершопов</a>
+        <a href="/zhurnal/">Журнал</a>
+        <a href="/school/">Школы барберов</a>
+        <a href="/vacancy/">Вакансии</a>
+        <a href="/owners/" class="btn brass">Добавить барбершоп</a>
+      </div>
+    </details>
+  </div>
+</header>
+<style>
+.hdr{background:var(--ink);color:#f3ede4;position:sticky;top:0;z-index:50;border-bottom:1px solid #2c2620}
+.hdr-in{display:flex;align-items:center;gap:22px;height:68px}
+.hdr-logo{flex:none;text-decoration:none;color:#fff}
+.hdr-nav{display:flex;align-items:center;gap:20px;font-size:15px;font-weight:550}
+.hdr-nav>a,.dd summary{text-decoration:none;color:#e9e1d5;white-space:nowrap;cursor:pointer}
+.hdr-nav>a:hover,.dd summary:hover{color:var(--brass2)}
+.dd{position:relative}.dd summary{list-style:none}.dd summary::-webkit-details-marker{display:none}
+.dd summary::after{content:' ▾';font-size:11px}
+.dd-menu{position:absolute;top:36px;left:-14px;background:#fff;color:var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:8px;min-width:220px;display:grid}
+.dd-menu a{padding:8px 12px;border-radius:8px;text-decoration:none}.dd-menu a:hover{background:var(--paper)}
+.dd-menu .all{color:var(--red);font-weight:600}
+.hdr-search{flex:1;min-width:0;max-width:340px;margin-left:auto}
+.hdr-search .field{background:#221d18;border-color:#3a332b;color:#fff;padding:10px 16px}
+.hdr-search .field::placeholder{color:#9b9184}
+.hdr-cta{flex:none}
+.burger{display:none;margin-left:auto}
+.burger summary{list-style:none;cursor:pointer;width:44px;height:44px;display:grid;place-content:center;gap:5px}
+.burger summary::-webkit-details-marker{display:none}
+.burger summary span{display:block;width:24px;height:2px;background:#fff;border-radius:2px}
+.burger-menu{position:fixed;left:0;right:0;top:68px;bottom:0;background:var(--ink);padding:16px;display:grid;align-content:start;gap:4px;overflow:auto}
+.burger-menu a:not(.btn){color:#f3ede4;text-decoration:none;padding:12px 4px;border-bottom:1px solid #2c2620;font-size:17px}
+.burger-menu .btn{margin-top:14px}
+.burger-menu form{margin-bottom:8px}
+@media (max-width:1180px){.hdr-cta{display:none}}
+@media (max-width:980px){.hdr-nav,.hdr-search{display:none}.burger{display:block}}
+</style>

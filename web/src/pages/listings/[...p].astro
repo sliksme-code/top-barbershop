@@ -1,0 +1,12 @@
+---
+import Listing from '../../components/Listing.astro';
+import { listShops, splitPage, TRUE } from '../../lib/catalog';
+import { shops } from '../../lib/text';
+const { parts, page } = splitPage(Astro.params.p);
+if (parts.length) return Astro.rewrite('/404/');
+const data = await listShops(TRUE, page);
+if (page > data.pages) return Astro.rewrite('/404/');
+---
+<Listing h1="Все барбершопы" title="Все барбершопы России и СНГ — каталог мужских парикмахерских"
+  description={`Каталог: ${shops(data.total)} в России, Украине, Беларуси и Казахстане. Адреса, цены на стрижку, фото, отзывы и онлайн-запись.`}
+  crumbs={[['Главная', '/'], ['Все барбершопы']]} base="/listings/" {page} {data} />

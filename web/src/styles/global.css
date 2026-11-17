@@ -1,0 +1,59 @@
+:root{
+  --ink:#15120f; --ink2:#2a2520; --muted:#6f665c; --paper:#f6f2ec; --card:#fff; --line:#e6ded2;
+  --brass:#b8893d; --brass2:#d9b46e; --red:#a3312b; --ok:#2f7d4f;
+  --r:14px; --shadow:0 1px 2px rgba(21,18,15,.06),0 8px 24px rgba(21,18,15,.06);
+  --w:1240px; --font:'Inter Variable',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--font);color:var(--ink);background:var(--paper);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+img{max-width:100%;height:auto;display:block}
+a{color:inherit}
+h1,h2,h3{line-height:1.15;letter-spacing:-.02em;margin:0 0 .5em;hyphens:none;overflow-wrap:normal}
+h1{font-size:clamp(28px,4.2vw,46px);font-weight:800}
+h2{font-size:clamp(22px,2.6vw,30px);font-weight:750}
+h3{font-size:18px;font-weight:700}
+p{margin:0 0 1em}
+.wrap{width:min(var(--w),100% - 32px);margin-inline:auto}
+.wrap .wrap{width:100%;max-width:none;margin:0}
+.muted{color:var(--muted)}
+.eyebrow{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--brass)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 20px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:#fff;font-weight:650;text-decoration:none;cursor:pointer;font-size:15px;line-height:1.2;white-space:nowrap}
+.btn:hover{background:var(--ink2)}
+.btn.brass{background:var(--brass);border-color:var(--brass);color:#16120c}
+.btn.brass:hover{background:var(--brass2)}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.ghost:hover{background:#fff}
+.btn.sm{padding:8px 14px;font-size:14px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:14px;text-decoration:none;max-width:100%;overflow-wrap:anywhere}
+a.chip:hover{border-color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.section{padding:48px 0}
+.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.section-head h2{margin:0}
+.grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fill,minmax(min(270px,100%),1fr))}
+.grid>*{min-width:0}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.badge{display:inline-block;padding:3px 9px;border-radius:6px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.badge.closed{background:var(--red);color:#fff}
+.badge.top{background:var(--brass);color:#16120c}
+.stars{color:var(--brass);letter-spacing:1px}
+.crumbs{font-size:14px;color:var(--muted);margin:18px 0 10px;display:flex;flex-wrap:wrap;gap:6px}
+.crumbs a{text-decoration:none}.crumbs a:hover{text-decoration:underline}
+.prose{font-size:17px;line-height:1.7;max-width:760px}
+.prose img{border-radius:10px;margin:18px 0}
+.prose h2{margin-top:1.6em}.prose h3{margin-top:1.4em}
+.prose a{color:var(--red)}
+.prose iframe{max-width:100%}
+.prose table{border-collapse:collapse;width:100%;display:block;overflow-x:auto}
+.prose td,.prose th{border:1px solid var(--line);padding:6px 10px}
+.pager{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:36px 0 8px}
+.pager a,.pager span{min-width:42px;height:42px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid var(--line);background:#fff;text-decoration:none;font-weight:600}
+.pager span.cur{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pager span.gap{border:0;background:none}
+.map{width:100%;height:420px;border-radius:var(--r);overflow:hidden;background:#e9e3da;border:1px solid var(--line)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+input,select,textarea,button{font:inherit}
+.field{width:100%;padding:13px 16px;border-radius:12px;border:1px solid var(--line);background:#fff;color:var(--ink)}
+.field:focus{outline:2px solid var(--brass);outline-offset:1px}
+@media (max-width:640px){.section{padding:32px 0}.panel{padding:16px}.map{height:320px}}

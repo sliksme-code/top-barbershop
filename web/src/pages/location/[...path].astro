@@ -1,0 +1,36 @@
+---
+import Listing from '../../components/Listing.astro';
+import { sql } from '../../lib/db';
+import { listShops, mapPoints, inLocation, splitPage, locationCounts } from '../../lib/catalog';
+import { inCity } from '../../lib/cases';
+import { cleanHtml, strip, clip, shops } from '../../lib/text';
+
+const { parts, page } = splitPage(Astro.params.path);
+const path = parts.join('/');
+const [loc] = await sql`select * from locations where path = ${path}`;
+if (!loc) return Astro.rewrite('/404/');
+const data = await listShops(inLocation(path), page);
+if (page > data.pages) return Astro.rewrite('/404/');
+const points = page === 1 ? await mapPoints(inLocation(path)) : [];
+const all = await locationCounts();
+// дерево: прямые дети с подсчётом по поддереву
+const total = (p: string) => all.filter((x) => x.path === p || x.path.startsWith(p + '/')).reduce((a, x) => a + x.n, 0);
+const children = all.filter((x) => x.parent_id === loc.id).map((x) => ({ ...x, t: total(x.path) })).filter((x) => x.t > 0).sort((a, b) => b.t - a.t);
+const parent = loc.parent_id ? all.find((x) => x.id === loc.parent_id) : null;
+const metros = await sql`select m.slug, m.name, count(*)::int n from metro m join barbershop_metro bm on bm.metro_id = m.id join barbershops b on b.id = bm.barbershop_id and b.status='published' join locations l on l.id=b.location_id where ${inLocation(path)} group by m.id order by n desc, m.name limit 60`;
+const where = inCity(loc.name);
+const h1 = `Барбершопы ${where}`;
+const title = `Барбершопы ${where}: адреса, цены, отзывы — ${shops(data.total)}`;
+const description = clip(strip(loc.description) || `Все барбершопы ${where} — мужские стрижки, бритьё и уход за бородой. Адреса на карте, цены, фото, рейтинги и онлайн-запись.`, 200);
+const crumbs: [string, string?][] = [['Главная', '/'], ['Города', '/goroda/']];
+if (parent) crumbs.push([parent.name, `/location/${parent.path}/`]);
+crumbs.push([loc.name]);
+---
+<Listing {h1} {title} {description} {crumbs} base={`/location/${path}/`} {page} {data} {points} intro={cleanHtml(loc.description)} eyebrow={parent?.name}>
+  {(children.length > 0 || metros.length > 0) && (
+    <div slot="chips" class="chips" style="margin-top:14px">
+      {children.map((c) => <a class="chip" href={`/location/${c.path}/`}>{c.name} <span class="muted">{c.t}</span></a>)}
+      {metros.map((m) => <a class="chip" href={`/metro/${m.slug}/`}>м. {m.name.replace(/\s*\((Мск|СПб|Спб)\)/, '')} <span class="muted">{m.n}</span></a>)}
+    </div>
+  )}
+</Listing>

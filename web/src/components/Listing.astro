@@ -1,0 +1,40 @@
+---
+import Base from '../layouts/Base.astro';
+import Crumbs from './Crumbs.astro';
+import ShopCard from './ShopCard.astro';
+import Pager from './Pager.astro';
+import YMap from './YMap.astro';
+import { breadcrumbLd } from '../lib/seo';
+import { shops } from '../lib/text';
+import type { Card } from '../lib/catalog';
+
+interface Props {
+  h1: string; title: string; description: string; crumbs: [string, string?][]; base: string; page: number;
+  data: { items: Card[]; total: number; pages: number }; points?: any[]; intro?: string | null; noindex?: boolean; query?: string; eyebrow?: string;
+}
+const { h1, title, description, crumbs, base, page, data, points = [], intro, noindex = false, query = '', eyebrow } = Astro.props;
+const t = page > 1 ? `${title} — страница ${page}` : title;
+const canonical = new URL((page > 1 ? `${base}page/${page}/` : base), Astro.site).href;
+---
+<Base title={t} description={description} canonical={canonical} noindex={noindex} jsonLd={breadcrumbLd(crumbs)}>
+  <div class="wrap">
+    <Crumbs items={crumbs} />
+    <header class="lst-head">
+      {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+      <h1>{h1}{page > 1 && <span class="muted"> · стр. {page}</span>}</h1>
+      <p class="muted">{data.total ? shops(data.total) + ' в каталоге' : 'Пока здесь нет барбершопов'}</p>
+      <slot name="chips" />
+    </header>
+    {page === 1 && points.length > 0 && <div class="lst-map"><YMap points={points} /></div>}
+    <div class="grid">{data.items.map((s, i) => <ShopCard s={s} eager={i < 3} />)}</div>
+    <Pager base={base} page={page} pages={data.pages} query={query} />
+    {page === 1 && intro && <section class="prose lst-intro" set:html={intro} />}
+    <slot />
+  </div>
+</Base>
+<style>
+.lst-head{margin:8px 0 24px}
+.lst-head h1{margin-bottom:6px}
+.lst-map{margin-bottom:28px}
+.lst-intro{margin-top:40px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:28px;max-width:none}
+</style>

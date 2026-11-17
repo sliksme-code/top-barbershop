@@ -1,0 +1,15 @@
+---
+import Listing from '../components/Listing.astro';
+import { sql } from '../lib/db';
+import { listShops, splitPage } from '../lib/catalog';
+const q = (Astro.url.searchParams.get('q') || '').trim().slice(0, 80);
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+const words = q.toLowerCase().replace(/ё/g, 'е').split(/[\s,.;]+/).filter((w) => w.length > 1).slice(0, 5);
+const hay = sql`lower(replace(concat_ws(' ', b.title, b.address, l.name, (select string_agg(m.name, ' ') from barbershop_metro bm join metro m on m.id = bm.metro_id where bm.barbershop_id = b.id), (select c.name from chains c where c.id = b.chain_id)), 'ё', 'е'))`;
+const where = words.length ? words.map((w) => sql`${hay} like ${'%' + w + '%'}`).reduce((a, b) => sql`${a} and ${b}`) : sql`false`;
+const data = await listShops(where, page);
+---
+<Listing h1={q ? `Поиск: «${q}»` : 'Поиск барбершопа'} title={q ? `Поиск «${q}» — TOP BARBERSHOP` : 'Поиск барбершопа — TOP BARBERSHOP'} description="Поиск барбершопов по названию, адресу, городу и станции метро." crumbs={[['Главная', '/'], ['Поиск']]} base="/search/" {page} {data} noindex query={q ? `?q=${encodeURIComponent(q)}` : ''}>
+  <form slot="chips" action="/search/" method="get" class="sf"><input name="q" value={q} class="field" placeholder="Название, улица, метро или город" aria-label="Поиск" /><button class="btn">Найти</button></form>
+</Listing>
+<style>.sf{display:flex;gap:10px;max-width:620px;margin-top:12px}.sf .field{flex:1;min-width:0}</style>

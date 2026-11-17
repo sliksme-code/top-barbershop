@@ -1,0 +1,16 @@
+---
+const { base, page, pages, query = '' } = Astro.props as { base: string; page: number; pages: number; query?: string };
+const href = (n: number) => (n === 1 ? base : `${base}page/${n}/`) + query;
+const nums: (number | '…')[] = [];
+for (let i = 1; i <= pages; i++) {
+  if (i === 1 || i === pages || Math.abs(i - page) <= 2) nums.push(i);
+  else if (nums[nums.length - 1] !== '…') nums.push('…');
+}
+---
+{pages > 1 && (
+  <nav class="pager" aria-label="Страницы">
+    {page > 1 && <a href={href(page - 1)} rel="prev">←</a>}
+    {nums.map((n) => (n === '…' ? <span class="gap">…</span> : n === page ? <span class="cur" aria-current="page">{n}</span> : <a href={href(n)}>{n}</a>))}
+    {page < pages && <a href={href(page + 1)} rel="next">→</a>}
+  </nav>
+)}

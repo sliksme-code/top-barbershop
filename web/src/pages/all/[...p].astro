@@ -1,0 +1,18 @@
+---
+import Listing from '../../components/Listing.astro';
+import { sql } from '../../lib/db';
+import { listShops, mapPoints, splitPage } from '../../lib/catalog';
+import { shops, clip, strip, cleanHtml } from '../../lib/text';
+const { parts, page } = splitPage(Astro.params.p);
+if (parts.length !== 1) return Astro.rewrite('/404/');
+const [c] = await sql`select * from chains where slug = ${parts[0]}`;
+if (!c || !/\p{L}/u.test(c.name)) return Astro.rewrite('/404/');
+const where = sql`b.chain_id = ${c.id}`;
+const data = await listShops(where, page);
+if (page > data.pages && data.total) return Astro.rewrite('/404/');
+const points = page === 1 ? await mapPoints(where) : [];
+const intro = c.description ? cleanHtml(/<p|<br/.test(c.description) ? c.description : c.description.split(/\n{2,}/).map((x: string) => `<p>${x}</p>`).join('')) : null;
+---
+<Listing h1={`Сеть барбершопов ${c.name}`} title={`${c.name} — сеть барбершопов: все адреса, цены, отзывы`}
+  description={clip(strip(c.description) || `Все барбершопы сети ${c.name}: ${shops(data.total)} с адресами на карте, ценами, фото и онлайн-записью.`, 200)}
+  crumbs={[['Главная', '/'], ['Сети барбершопов', '/samye-krupnye-seti-barbershopov/'], [c.name]]} base={`/all/${c.slug}/`} {page} {data} {points} {intro} eyebrow="Сеть барбершопов" />
