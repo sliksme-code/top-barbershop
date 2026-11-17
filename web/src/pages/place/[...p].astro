@@ -9,6 +9,7 @@ import { img, rel } from '../../lib/img';
 import { breadcrumbLd, abs } from '../../lib/seo';
 import { cleanHtml, strip, clip, rub, phoneHref, ensureUrl, dateRu, plural } from '../../lib/text';
 import { site } from '../../data/site';
+import { inCity } from '../../lib/cases';
 
 const parts = (Astro.params.p || '').split('/').filter(Boolean);
 if (parts.length === 0) return Astro.redirect('/listings/', 301);
@@ -47,7 +48,7 @@ const rating = s.rating_f ? Math.round(s.rating_f * 10) / 10 : null;
 const metroNames = metros.map((m) => m.name.replace(/\s*\((Мск|СПб|Спб)\)/, ''));
 const descText = strip(s.description);
 const strizh = s.services?.strizh ? rub(s.services.strizh) : null;
-const title = s.seo_title || `${s.title} — барбершоп${s.city ? ' в ' + s.city : ''}${metroNames[0] ? ', м. ' + metroNames[0] : ''}: цены, отзывы, запись`;
+const title = s.seo_title || `${s.title} — барбершоп${s.city ? ' ' + inCity(s.city).replace(/^— /, ', ') : ''}${metroNames[0] ? ', м. ' + metroNames[0] : ''}: цены, отзывы, запись`;
 const description = clip(s.seo_description || [`${s.title} — барбершоп${s.address ? ' по адресу ' + s.address : ''}${s.city ? ', ' + s.city : ''}.`, strizh ? `Мужская стрижка — ${strizh}.` : '', descText].filter(Boolean).join(' '), 200);
 const crumbs: [string, string?][] = [['Главная', '/']];
 if (country) crumbs.push([country.name, `/location/${country.path}/`]);

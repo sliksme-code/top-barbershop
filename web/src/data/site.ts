@@ -52,4 +52,7 @@ export const site = {
 
 export const isProduction = process.env.SITE_ENV === 'production';
 // Один контейнер обслуживает и боевой, и тестовый домен: индексируем только боевой
-export const isProdHost = (url: URL) => url.hostname === 'top-barbershop.com' || (isProduction && url.hostname !== 'new.top-barbershop.com' && url.hostname !== 'localhost');
+export const isProdHost = (req: Request) => {
+  const h = (req.headers.get('x-forwarded-host') || req.headers.get('host') || '').split(':')[0].toLowerCase();
+  return h === 'top-barbershop.com';
+};
