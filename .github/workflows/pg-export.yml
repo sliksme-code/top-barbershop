@@ -1,0 +1,23 @@
+name: pg-export
+on: workflow_dispatch
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: dump catalog tables (без пользователей)
+        env:
+          KEY: ${{ secrets.VPS_SSH_KEY }}
+          HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh; echo "$KEY" > ~/.ssh/id; chmod 600 ~/.ssh/id
+          T="-t features -t locations -t metro -t chains -t collections -t barbershops -t barbershop_metro -t barbershop_collections -t reviews -t categories -t posts -t post_categories -t pages -t school_cities -t schools -t vacancy_cities -t vacancies"
+          ssh -i ~/.ssh/id -o StrictHostKeyChecking=no deploy@$HOST "cd /opt/top-barbershop && set -a && . ./.env && docker compose exec -T postgres pg_dump -U \$POSTGRES_USER -d \$POSTGRES_DB --no-owner --no-acl $T" | gzip > catalog.sql.gz
+          ssh -i ~/.ssh/id -o StrictHostKeyChecking=no deploy@$HOST "cd /opt/top-barbershop/legacy/uploads && find . -type f | sed 's#^\./##'" | gzip > uploads-list.txt.gz
+          ls -la
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalog
+          path: |
+            catalog.sql.gz
+            uploads-list.txt.gz
+          retention-days: 2
