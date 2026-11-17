@@ -41,6 +41,15 @@ services:
       YANDEX_MAPS_KEY: ${YANDEX_MAPS_KEY}
       SMARTCAPTCHA_CLIENT_KEY: ${SMARTCAPTCHA_CLIENT_KEY}
       SMARTCAPTCHA_SERVER_KEY: ${SMARTCAPTCHA_SERVER_KEY}
+      UPLOAD_ROOT: /data/uploads
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      ADMIN_NOTIFY_EMAIL: ${ADMIN_NOTIFY_EMAIL:-}
+    volumes:
+      - ./legacy/uploads:/data/uploads   # загрузки владельцев — туда же, где фото старого сайта
     depends_on: [postgres, directus, meilisearch]
 
   directus:
