@@ -48,6 +48,10 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       EMAIL_FROM: ${EMAIL_FROM}
       ADMIN_NOTIFY_EMAIL: ${ADMIN_NOTIFY_EMAIL:-}
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+      YOOKASSA_SECRET: ${YOOKASSA_SECRET:-}
+      YOOKASSA_RECEIPT: ${YOOKASSA_RECEIPT:-1}
+      YOOKASSA_TAX_SYSTEM: ${YOOKASSA_TAX_SYSTEM:-6}
     volumes:
       - ./legacy/uploads:/data/uploads   # загрузки владельцев — туда же, где фото старого сайта
     depends_on: [postgres, directus, meilisearch]

@@ -91,7 +91,7 @@ export async function startPayment(order: { id: number; amount: number }, descri
       confirmation: { type: 'redirect', return_url: `https://top-barbershop.com/billing/?paid=${order.id}` },
       description: description.slice(0, 128),
       metadata: { order_id: String(order.id) },
-      receipt: { customer: { email }, items: [{ description: description.slice(0, 128), quantity: '1.00', amount: { value: order.amount.toFixed(2), currency: 'RUB' }, vat_code: 1, payment_mode: 'full_payment', payment_subject: 'service' }] },
+      ...(process.env.YOOKASSA_RECEIPT !== '0' ? { receipt: { customer: { email }, tax_system_code: Number(process.env.YOOKASSA_TAX_SYSTEM || 6), items: [{ description: description.slice(0, 128), quantity: '1.00', amount: { value: order.amount.toFixed(2), currency: 'RUB' }, vat_code: 1, payment_mode: 'full_payment', payment_subject: 'service' }] } } : {}),
     }),
     signal: AbortSignal.timeout(15000),
   });
