@@ -1,0 +1,43 @@
+name: users-export
+# Выгрузка пользователей, зашифрованная открытым ключом из inputs (расшифровать может только владелец закрытого ключа).
+# Открытые данные в логи не попадают; результат — во временной ветке export-tmp, удалить после скачивания.
+on:
+  workflow_dispatch:
+    inputs:
+      pubkey:
+        description: RSA public key (PEM, base64)
+        required: true
+permissions:
+  contents: write
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          KEY: ${{ secrets.VPS_SSH_KEY }}
+          HOST: ${{ secrets.VPS_HOST }}
+          PUB: ${{ inputs.pubkey }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh; echo "$KEY" > ~/.ssh/id; chmod 600 ~/.ssh/id
+          echo "$PUB" | base64 -d > pub.pem
+          cat > q.sql <<'SQL'
+          copy (
+            select u.id, coalesce(u.display_name, ''), coalesce(nullif(trim(concat_ws(' ', u.first_name, u.last_name)), ''), '') as fio,
+              coalesce(u.email, ''), coalesce(u.phone, ''), coalesce(u.login, ''), coalesce(u.role, ''),
+              to_char(u.registered_at, 'YYYY-MM-DD'), coalesce(to_char(u.last_login_at, 'YYYY-MM-DD HH24:MI'), ''),
+              (select count(*) from barbershops b where b.owner_id = u.id or b.submitted_by = u.id),
+              coalesce((select string_agg(b.title || ' — ' || case when b.status = 'published' and b.slug is not null then 'https://top-barbershop.com/place/' || b.slug || '/' else '(' || b.status || ')' end, E'\n' order by b.title) from barbershops b where b.owner_id = u.id or b.submitted_by = u.id), ''),
+              coalesce((select string_agg(distinct coalesce(b.phone, ''), ', ') from barbershops b where (b.owner_id = u.id or b.submitted_by = u.id) and b.phone is not null and b.phone <> ''), '')
+            from site_users u where u.id > 0 order by 10 desc, u.id
+          ) to stdout with csv header;
+          SQL
+          ssh -i ~/.ssh/id -o StrictHostKeyChecking=no deploy@$HOST "cd /opt/top-barbershop && set -a && . ./.env && docker compose exec -T postgres psql -U \$POSTGRES_USER -d \$POSTGRES_DB -q" < q.sql > users.csv
+          echo "строк: $(wc -l < users.csv)"
+          openssl rand -out k.bin 32
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in users.csv -out users.csv.enc -pass file:k.bin
+          openssl pkeyutl -encrypt -pubin -inkey pub.pem -pkeyopt rsa_padding_mode:oaep -in k.bin -out k.bin.enc
+          rm -f users.csv k.bin
+          git init -q x && cd x && mv ../users.csv.enc ../k.bin.enc . && git checkout -q -b export-tmp
+          git add . && git -c user.name=ci -c user.email=ci@local commit -qm export
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" export-tmp

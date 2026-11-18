@@ -1,9 +1,14 @@
 name: cleanup-branch
-on: workflow_dispatch
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: ветка
+        default: data-export
 permissions:
   contents: write
 jobs:
   del:
     runs-on: ubuntu-latest
     steps:
-      - run: git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" --delete data-export || true
+      - run: git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" --delete ${{ inputs.branch || 'data-export' }} || true
