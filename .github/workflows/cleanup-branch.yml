@@ -11,4 +11,7 @@ jobs:
   del:
     runs-on: ubuntu-latest
     steps:
-      - run: git push "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" --delete ${{ inputs.branch || 'data-export' }} || true
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          B: ${{ inputs.branch || 'data-export' }}
+        run: gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/$B" && echo "удалена $B" || echo "нет ветки $B"
