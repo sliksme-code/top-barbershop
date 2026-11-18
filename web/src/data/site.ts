@@ -42,11 +42,9 @@ export const site = {
   ],
   footer: [
     { href: '/about/', label: 'О проекте' },
-    { href: '/faq/', label: 'FAQ' },
-    { href: '/owners/', label: 'Для владельцев' },
+    { href: '/add/', label: 'Добавить барбершоп' },
     { href: '/contact/', label: 'Контакты' },
     { href: '/logo/', label: 'Логотипы' },
-    { href: '/policy/', label: 'Политика' },
   ],
 } as const;
 

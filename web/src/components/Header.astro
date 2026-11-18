@@ -30,7 +30,7 @@ const user = Astro.locals.user;
       <input id="hq" name="q" value={q} placeholder="Барбершоп, улица, метро" class="field" />
     </form>
     <a href={user ? '/my/' : '/login/'} class="hdr-user">{user ? 'Кабинет' : 'Войти'}</a>
-    <a href={user ? '/add/' : '/owners/'} class="btn brass sm hdr-cta">Добавить барбершоп</a>
+    <a href="/add/" class="btn brass sm hdr-cta">Добавить барбершоп</a>
     <details class="burger">
       <summary aria-label="Меню"><span></span><span></span><span></span></summary>
       <div class="burger-menu">
@@ -43,7 +43,7 @@ const user = Astro.locals.user;
         <a href="/school/">Школы барберов</a>
         <a href="/vacancy/">Вакансии</a>
         <a href={user ? '/my/' : '/login/'}>{user ? 'Личный кабинет' : 'Войти'}</a>
-        <a href={user ? '/add/' : '/owners/'} class="btn brass">Добавить барбершоп</a>
+        <a href="/add/" class="btn brass">Добавить барбершоп</a>
       </div>
     </details>
   </div>

@@ -48,7 +48,8 @@ const num = (v: string) => { const n = Number(v.replace(/[^\d.]/g, '')); return 
 const url = (v: string) => (!v ? null : /^https?:\/\//i.test(v) ? v : 'https://' + v);
 const paras = (t: string) => t.split(/\n{2,}|\r\n\r\n/).map((p) => p.trim()).filter(Boolean).map((p) => `<p>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\n/g, '<br>')}</p>`).join('\n');
 
-export async function readShopForm(form: FormData, features: any[], existing?: any) {
+/** pro = можно менять телефон, сайт, онлайн-запись и соцсети (тариф PRO); иначе остаются прежние значения */
+export async function readShopForm(form: FormData, features: any[], existing?: any, pro = false) {
   const errors: string[] = [];
   const title = str(form, 'title', 120);
   const location_id = Number(form.get('location_id')) || null;
@@ -77,9 +78,10 @@ export async function readShopForm(form: FormData, features: any[], existing?: a
   const data = {
     title, location_id, address, map_address: address,
     lat: Number.isFinite(lat) && lat ? lat : null, lng: Number.isFinite(lng) && lng ? lng : null,
-    phone: str(form, 'phone', 40) || null, email: str(form, 'email', 120) || null,
-    website: url(str(form, 'website', 200)), booking_url: url(str(form, 'booking_url', 300)),
-    instagram: url(str(form, 'instagram', 200)), vk: url(str(form, 'vk', 200)),
+    email: str(form, 'email', 120) || null,
+    ...(pro
+      ? { phone: str(form, 'phone', 40) || null, website: url(str(form, 'website', 200)), booking_url: url(str(form, 'booking_url', 300)), instagram: url(str(form, 'instagram', 200)), vk: url(str(form, 'vk', 200)) }
+      : { phone: existing?.phone ?? null, website: existing?.website ?? null, booking_url: existing?.booking_url ?? null, instagram: existing?.instagram ?? null, vk: existing?.vk ?? null }),
     description: paras(str(form, 'description', 6000)) || null,
     services, amenities, opening_hours: hours.length ? hours : null,
     gallery: gallery.filter((g) => g !== cover), cover_image: cover,

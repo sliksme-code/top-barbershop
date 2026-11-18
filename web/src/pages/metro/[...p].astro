@@ -8,7 +8,7 @@ if (parts.length !== 1) return Astro.rewrite('/404/');
 const [m] = await sql`select * from metro where slug = ${parts[0]}`;
 if (!m) return Astro.rewrite('/404/');
 const where = sql`b.id in (select barbershop_id from barbershop_metro where metro_id = ${m.id})`;
-const data = await listShops(where, page);
+const data = await listShops(where, page, undefined, true);
 if (page > data.pages && data.total) return Astro.rewrite('/404/');
 const points = page === 1 ? await mapPoints(where) : [];
 const name = m.name.replace(/\s*\((Мск|СПб|Спб)\)/, '');

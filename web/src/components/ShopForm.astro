@@ -2,7 +2,7 @@
 import '../styles/forms.css';
 import Captcha from './Captcha.astro';
 import { img } from '../lib/img';
-const { refs, v = {}, metroSel = [], submit = 'Сохранить' } = Astro.props as { refs: any; v?: any; metroSel?: number[]; submit?: string };
+const { refs, v = {}, metroSel = [], submit = 'Сохранить', pro = false } = Astro.props as { refs: any; v?: any; metroSel?: number[]; submit?: string; pro?: boolean };
 const svc = refs.features.filter((f: any) => f.kind === 'service');
 const am = refs.features.filter((f: any) => f.kind === 'amenity');
 const hours = Object.fromEntries(((v.opening_hours || []) as any[]).map((h) => [h.day, h]));
@@ -40,10 +40,15 @@ const cityPath = refs.locations.find((l: any) => l.id === v.location_id)?.path |
   </fieldset>
 
   <fieldset>
-    <legend>Контакты и запись</legend>
+    <legend>Контакты для администрации сайта</legend>
+    <label>E-mail <small>не публикуется</small><input class="field" name="email" type="email" maxlength="120" value={v.email} /></label>
+  </fieldset>
+
+  <fieldset disabled={!pro} class={pro ? '' : 'locked'}>
+    <legend>Телефон, сайт и онлайн-запись {pro ? <span class="badge top">PRO</span> : <span class="badge">Только PRO</span>}</legend>
+    {!pro && <p class="alt" style="margin:0">На бесплатном тарифе эти данные не показываются клиентам. <a href={v.id ? `/billing/?id=${v.id}` : '/tarify/'}>Подключите PRO за 1 990 ₽/мес</a> — и клиенты смогут звонить, переходить на сайт и записываться онлайн прямо из карточки.</p>}
     <div class="row">
       <label>Телефон <input class="field" name="phone" maxlength="40" value={v.phone} inputmode="tel" /></label>
-      <label>E-mail <input class="field" name="email" type="email" maxlength="120" value={v.email} /></label>
     </div>
     <div class="row">
       <label>Сайт <input class="field" name="website" maxlength="200" value={v.website} placeholder="https://" /></label>
@@ -106,6 +111,7 @@ const cityPath = refs.locations.find((l: any) => l.id === v.location_id)?.path |
   <div><button class="btn brass" type="submit">{submit}</button></div>
 </form>
 <style>
+.locked{opacity:.75;background:#faf7f2}.locked legend .badge{background:var(--line)}
 .hrow{display:grid;grid-template-columns:130px 1fr 1fr auto;gap:10px;align-items:center}
 .hrow>*{min-width:0}
 .ph{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}

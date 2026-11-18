@@ -11,6 +11,7 @@ import { cleanHtml, strip, clip, rub, phoneHref, ensureUrl, dateRu, plural } fro
 import { site } from '../../data/site';
 import { inCity } from '../../lib/cases';
 import Captcha from '../../components/Captcha.astro';
+import { isPro } from '../../lib/billing';
 import '../../styles/forms.css';
 
 const parts = (Astro.params.p || '').split('/').filter(Boolean);
@@ -57,13 +58,15 @@ if (country) crumbs.push([country.name, `/location/${country.path}/`]);
 if (s.city) crumbs.push([s.city, `/location/${s.city_path}/`]);
 crumbs.push([s.title]);
 
-const phone = phoneHref(s.phone);
-const website = ensureUrl(s.website);
-const booking = ensureUrl(s.booking_url) || ensureUrl(s.booking_url_alt);
-const socials = [['Instagram*', ensureUrl(s.instagram)], ['ВКонтакте', ensureUrl(s.vk)], ['YouTube', ensureUrl(s.youtube)]].filter(([, u]) => u) as [string, string][];
+// Тариф: телефон, сайт, онлайн-запись и соцсети показываем только у PRO
+const pro = isPro(s);
+const phone = pro ? phoneHref(s.phone) : null;
+const website = pro ? ensureUrl(s.website) : null;
+const booking = pro ? ensureUrl(s.booking_url) || ensureUrl(s.booking_url_alt) : null;
+const socials = (pro ? [['Instagram*', ensureUrl(s.instagram)], ['ВКонтакте', ensureUrl(s.vk)], ['YouTube', ensureUrl(s.youtube)]].filter(([, u]) => u) : []) as [string, string][];
 const ld: any = {
   '@context': 'https://schema.org', '@type': 'HairSalon', name: s.title, url: abs(`/place/${s.slug}/`),
-  image: gallery.slice(0, 5).map((g) => abs(rel(g)!)), description: clip(descText, 300) || undefined, telephone: s.phone || undefined,
+  image: gallery.slice(0, 5).map((g) => abs(rel(g)!)), description: clip(descText, 300) || undefined, telephone: (pro && s.phone) || undefined,
   address: s.address ? { '@type': 'PostalAddress', streetAddress: s.address, addressLocality: s.city || undefined, addressCountry: country?.name || undefined } : undefined,
   geo: s.lat && s.lng ? { '@type': 'GeoCoordinates', latitude: s.lat, longitude: s.lng } : undefined,
   priceRange: strizh ? `от ${strizh}` : undefined,
@@ -181,6 +184,13 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
           {!s.closed && booking && <a class="btn brass pl-wide" href={booking} target="_blank" rel="nofollow noopener" data-goal={site.goals.booking}>Записаться онлайн</a>}
         </div>
         {s.lat && s.lng && <YMap points={[{ title: s.title, lat: s.lat, lng: s.lng, address: s.address }]} zoom={15} height={300} />}
+        {mine && !pro && (
+          <div class="panel upsell">
+            <p class="eyebrow">Видно только вам</p>
+            <p><b>Телефон, сайт и онлайн-запись скрыты</b> — на бесплатном тарифе клиенты их не видят.</p>
+            <a class="btn brass pl-wide" href={`/billing/?id=${s.id}`}>Подключить PRO — 1 990 ₽/мес</a>
+          </div>
+        )}
         {colls.length > 0 && <div class="panel"><h2 class="h3">В подборках</h2><div class="chips">{colls.map((c) => <a class="chip" href={`/collection/${c.slug}/`}>{c.name}</a>)}</div></div>}
         {!mine && <p class="muted pl-note">Вы владелец? <a href={`/claim/?id=${s.id}`} rel="nofollow">Это мой барбершоп</a> — получите доступ к карточке.</p>}
       </aside>
@@ -237,6 +247,7 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
 .rv{border-top:1px solid var(--line);padding:16px 0}.rv:first-of-type{border-top:0}
 .rv-h{margin-bottom:6px}
 
+.upsell{border-color:var(--brass);background:#fffaf0}.upsell p{margin:0 0 8px}
 .fav.on{background:var(--ink);color:#fff}
 .rv-form{margin-top:12px}.rv-form summary{list-style:none;display:inline-flex}.rv-form summary::-webkit-details-marker{display:none}.rv-form form{margin-top:16px}
 .stars-in{display:flex;flex-direction:row-reverse;justify-content:flex-end;gap:2px;border:0;padding:0;background:none}

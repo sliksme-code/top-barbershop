@@ -1,0 +1,123 @@
+---
+import AccountLayout from '../components/AccountLayout.astro';
+import '../styles/forms.css';
+import { sql } from '../lib/db';
+import { sameOrigin, str } from '../lib/forms';
+import { sendMail, ADMIN_EMAIL } from '../lib/mail';
+import { PRICE, PRO_PERIODS, SELLER, isPro, priorityCalendar, createProOrder, reservePriority, startPayment, paymentsEnabled, syncPayment, weekLabel } from '../lib/billing';
+import { dateRu } from '../lib/text';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login/?next=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
+const isAdmin = ['administrator', 'editor'].includes(user.role || '');
+const focus = Number(Astro.url.searchParams.get('id')) || 0;
+const shopsOf = () => sql`select b.id, b.slug, b.title, b.status, b.pro_until, b.location_id, l.name city, l.path city_path from barbershops b left join locations l on l.id = b.location_id
+  where ${isAdmin && focus ? sql`b.id = ${focus}` : sql`(b.owner_id = ${user.id} or b.submitted_by = ${user.id})`} and b.status <> 'trash' order by (b.id = ${focus}) desc, b.title`;
+let shops = await shopsOf();
+let msg: [string, string] | null = null;
+
+const paid = Number(Astro.url.searchParams.get('paid')) || 0;
+if (paid) {
+  const [o] = await sql`select id, status, payment_id from orders where id = ${paid} and (user_id = ${user.id} or ${isAdmin})`;
+  if (o?.payment_id && o.status === 'pending') await syncPayment(o.payment_id);
+  const [o2] = o ? await sql`select status, kind from orders where id = ${paid}` : [];
+  msg = o2?.status === 'paid' ? ['ok', o2.kind === 'pro' ? 'Оплата прошла — тариф PRO включён. Телефон, сайт и онлайн-запись уже видны в карточке.' : 'Оплата прошла — место в топе города за вами.'] : o2 ? ['err', 'Оплата ещё не подтверждена. Если вы оплатили, обновите страницу через минуту.'] : null;
+  shops = await shopsOf();
+}
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const shop = shops.find((s) => s.id === Number(f.get('shop')));
+  const action = str(f, 'action', 20);
+  if (!sameOrigin(Astro.request) || !shop) msg = ['err', 'Обновите страницу и попробуйте снова.'];
+  else {
+    let res: any = null, what = '';
+    if (action === 'pro') {
+      const months = Number(f.get('months')) || 1;
+      res = { order: await createProOrder(user.id, shop.id, months) };
+      what = `PRO для «${shop.title}» на ${months} мес`;
+    } else if (action === 'priority') {
+      if (shop.status !== 'published' || !shop.location_id) res = { error: 'Приоритет доступен опубликованным барбершопам с указанным городом.' };
+      else { const week = str(f, 'week', 10); res = await reservePriority(user.id, shop.id, shop.location_id, week); what = `Топ города (${shop.city}) для «${shop.title}», неделя ${weekLabel(week)}`; }
+    }
+    if (res?.error) msg = ['err', res.error];
+    else if (res?.order) {
+      const url = await startPayment(res.order, `TOP BARBERSHOP: ${what}`, user.email).catch(() => null);
+      if (url) return Astro.redirect(url);
+      if (ADMIN_EMAIL) sendMail(ADMIN_EMAIL, `Новый заказ №${res.order.id}: ${res.order.amount} ₽`, `${user.email}\n${what}\nСумма: ${res.order.amount} ₽\nОтметить оплату: https://cms.new.top-barbershop.com/admin/content/orders/${res.order.id}`);
+      msg = ['ok', `Заказ №${res.order.id} на ${res.order.amount.toLocaleString('ru-RU')} ₽ создан: ${what}. ${paymentsEnabled ? '' : 'Мы пришлём счёт на ' + user.email + ' в течение рабочего дня; услуга включится сразу после оплаты.'}`];
+    }
+  }
+}
+const cal = Object.fromEntries(await Promise.all(shops.filter((s) => s.location_id && s.status === 'published').map(async (s) => [s.id, await priorityCalendar(s.location_id, s.id)])));
+const orders = await sql`select o.id, o.kind, o.months, o.week_start::text week, o.amount, o.status, o.created_at, b.title from orders o join barbershops b on b.id = o.barbershop_id where o.user_id = ${user.id} order by o.created_at desc limit 30`;
+const ST: Record<string, string> = { pending: 'ожидает оплаты', paid: 'оплачен', cancelled: 'отменён' };
+---
+<AccountLayout title="Тариф и продвижение" active="/billing/">
+  {msg && <p class={`msg ${msg[0]}`}>{msg[1]}</p>}
+  {shops.length === 0 && <div class="panel" style="max-width:720px"><p>Сначала <a href="/add/">добавьте барбершоп</a> или заявите права на существующий кнопкой «Это мой барбершоп» в его карточке.</p></div>}
+  <div class="bl">
+    {shops.map((s) => {
+      const pro = isPro(s);
+      return (
+        <section class="panel bl-shop" id={`s${s.id}`}>
+          <header class="bl-h">
+            <div><h2>{s.title}</h2><p class="muted">{s.city}{s.status !== 'published' && ' · на модерации'}</p></div>
+            {pro ? <span class="badge top">PRO до {dateRu(s.pro_until)}</span> : <span class="badge free">Бесплатный тариф</span>}
+          </header>
+          <div class="bl-grid">
+            <form method="post" class="bl-box">
+              <h3>Тариф PRO · {PRICE.pro.toLocaleString('ru-RU')} ₽/мес</h3>
+              <ul class="bl-l"><li>Телефон с кнопкой звонка</li><li>Кнопка «Записаться онлайн»</li><li>Ссылки на сайт и соцсети</li></ul>
+              <input type="hidden" name="action" value="pro" /><input type="hidden" name="shop" value={s.id} />
+              <div class="bl-row">
+                <select class="field" name="months" aria-label="Срок">{PRO_PERIODS.map((m) => <option value={m}>{m} мес. — {(PRICE.pro * m).toLocaleString('ru-RU')} ₽</option>)}</select>
+                <button class="btn brass">{pro ? 'Продлить' : 'Подключить'}</button>
+              </div>
+            </form>
+            <form method="post" class="bl-box">
+              <h3>Топ города · {PRICE.priority.toLocaleString('ru-RU')} ₽/неделя</h3>
+              <p class="alt">Барбершоп в первой тройке на странице города{s.city ? ` «${s.city}»` : ''} и у станций метро на 7 дней (пн–вс). В городе всего 3 места в неделю.</p>
+              <input type="hidden" name="action" value="priority" /><input type="hidden" name="shop" value={s.id} />
+              {cal[s.id] ? (
+                <div class="wk">
+                  {cal[s.id].map((w: any) => (
+                    <label class={`wk-i${w.mine ? ' mine' : ''}${!w.free && !w.mine ? ' full' : ''}`}>
+                      <input type="radio" name="week" value={w.week} required disabled={!w.free || !!w.mine} />
+                      <span>{w.label}</span>
+                      <small>{w.mine ? (w.mine === 'paid' ? 'ваша неделя ✓' : 'забронировано, ждёт оплаты') : w.free ? `свободно ${w.free} из 3` : 'мест нет'}</small>
+                    </label>
+                  ))}
+                </div>
+              ) : <p class="alt">Станет доступно после публикации барбершопа.</p>}
+              {cal[s.id] && <div style="margin-top:12px"><button class="btn">Забронировать неделю</button></div>}
+            </form>
+          </div>
+        </section>
+      );
+    })}
+  </div>
+  {orders.length > 0 && (
+    <section class="panel" style="margin-top:20px">
+      <h2 class="h3">Заказы</h2>
+      <table class="ord"><thead><tr><th>№</th><th>Услуга</th><th>Сумма</th><th>Статус</th></tr></thead>
+        <tbody>{orders.map((o) => <tr><td>{o.id}</td><td>{o.title}: {o.kind === 'pro' ? `PRO, ${o.months} мес.` : `топ города, ${weekLabel(o.week)}`}<br /><small class="muted">{dateRu(o.created_at)}</small></td><td>{o.amount.toLocaleString('ru-RU')} ₽</td><td>{ST[o.status]}</td></tr>)}</tbody></table>
+      <p class="alt">Неоплаченная бронь топа сгорает через 48 часов. Продавец: {SELLER.name}, ИНН {SELLER.inn}. <a href="/oferta/">Оферта</a>.</p>
+    </section>
+  )}
+</AccountLayout>
+<style>
+.bl{display:grid;gap:18px;max-width:1000px}
+.bl-h{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.bl-h h2{margin:0;font-size:22px}.bl-h p{margin:2px 0 0}
+.badge.free{background:var(--line)}
+.bl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:16px;margin-top:14px}
+.bl-box{border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}.bl-box h3{margin:0 0 8px}
+.bl-l{margin:0 0 12px;padding-left:18px}.bl-row{display:flex;gap:8px;flex-wrap:wrap}.bl-row select{flex:1;min-width:0}
+.wk{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.wk-i{display:grid;gap:2px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;cursor:pointer;font-size:14px;position:relative;background:#fff}
+.wk-i input{position:absolute;opacity:0}.wk-i small{color:var(--muted)}
+.wk-i:has(input:checked){border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.wk-i.full{opacity:.45;cursor:not-allowed}.wk-i.mine{border-color:var(--brass);background:#fffaf0;cursor:default}
+.ord{width:100%;border-collapse:collapse;font-size:15px}.ord td,.ord th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+@media (max-width:560px){.ord{display:block;overflow-x:auto}}
+</style>

@@ -1,0 +1,16 @@
+---
+import Base from '../layouts/Base.astro';
+import Crumbs from '../components/Crumbs.astro';
+import Pricing from '../components/Pricing.astro';
+import { breadcrumbLd } from '../lib/seo';
+const crumbs: [string, string?][] = [['Главная', '/'], ['Тарифы для владельцев']];
+---
+<Base title="Тарифы для владельцев барбершопов — TOP BARBERSHOP" description="Бесплатная карточка барбершопа в каталоге, тариф PRO с телефоном и онлайн-записью за 1 990 ₽/мес и размещение в топе города за 3 000 ₽ в неделю." jsonLd={breadcrumbLd(crumbs)}>
+  <div class="wrap">
+    <Crumbs items={crumbs} />
+    <h1>Тарифы для владельцев барбершопов</h1>
+    <p class="muted" style="max-width:720px">Добавить барбершоп в каталог — бесплатно. Платите, только если хотите, чтобы клиенты звонили и записывались к вам прямо из карточки.</p>
+    <Pricing />
+    <p style="text-align:center;margin-top:28px"><a class="btn brass" href="/add/">Добавить барбершоп</a></p>
+  </div>
+</Base>

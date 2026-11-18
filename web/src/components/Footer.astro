@@ -1,6 +1,7 @@
 ---
 import Logo from './Logo.astro';
 import { site } from '../data/site';
+import { SELLER } from '../lib/billing';
 const year = new Date().getFullYear();
 ---
 <footer class="ftr">
@@ -21,10 +22,16 @@ const year = new Date().getFullYear();
     <div>
       <p class="ftr-h">Проект</p>
       {site.footer.map((l) => <a href={l.href}>{l.label}</a>)}
+      <a href="/tarify/">Тарифы для владельцев</a>
+      <a href="/oferta/">Публичная оферта</a>
+      <a href="/policy/">Политика конфиденциальности</a>
       <a href="https://awards.top-barbershop.com/">Премия</a>
     </div>
   </div>
-  <div class="wrap ftr-bottom">© 2016–{year} TOP BARBERSHOP. Информация на сайте не является публичной офертой.</div>
+  <div class="wrap ftr-bottom">
+    <p>© 2016–{year} TOP BARBERSHOP. {SELLER.name}, ИНН {SELLER.inn}, ОГРНИП {SELLER.ogrnip}. <a href={`mailto:${SELLER.email}`}>{SELLER.email}</a></p>
+    <p>Сведения о барбершопах в каталоге носят справочный характер. Условия платных услуг для владельцев — в <a href="/oferta/">публичной оферте</a>.</p>
+  </div>
 </footer>
 <style>
 .ftr{background:var(--ink);color:#cfc6b9;margin-top:64px;padding:48px 0 24px}
@@ -35,6 +42,7 @@ const year = new Date().getFullYear();
 .ftr-h{color:#fff;font-weight:700;margin-bottom:8px}
 .ftr-about{margin:16px 0;max-width:360px;font-size:15px}
 .ftr .chip{background:transparent;color:#fff;border-color:#3a332b}
+.ftr-bottom p{margin:0 0 6px}.ftr-bottom a{color:#cfc6b9}
 .ftr-bottom{border-top:1px solid #2c2620;margin-top:32px;padding-top:18px;font-size:13px;color:#8d8478}
 @media (max-width:820px){.ftr-grid{grid-template-columns:1fr 1fr}}
 @media (max-width:480px){.ftr-grid{grid-template-columns:1fr}}

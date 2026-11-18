@@ -1,0 +1,50 @@
+---
+import { PRICE } from '../lib/billing';
+const { cta = true } = Astro.props;
+---
+<div class="prc">
+  <div class="prc-c">
+    <p class="eyebrow">Бесплатно</p>
+    <h3>Базовый</h3>
+    <p class="prc-p">0 ₽</p>
+    <ul>
+      <li>Карточка в каталоге и на карте</li>
+      <li>Адрес, метро, часы работы</li>
+      <li>Описание и до 15 фото</li>
+      <li>Цены на услуги</li>
+      <li>Отзывы и рейтинг</li>
+      <li class="no">Телефон, сайт и онлайн-запись не показываются</li>
+    </ul>
+  </div>
+  <div class="prc-c pro">
+    <p class="eyebrow">Для тех, кому нужны клиенты</p>
+    <h3>PRO</h3>
+    <p class="prc-p">{PRICE.pro.toLocaleString('ru-RU')} ₽ <small>/ мес за барбершоп</small></p>
+    <ul>
+      <li>Всё из бесплатного</li>
+      <li><b>Телефон</b> с кнопкой звонка</li>
+      <li><b>Кнопка «Записаться онлайн»</b> — YCLIENTS, DIKIDI и др.</li>
+      <li><b>Ссылки на сайт</b> и соцсети</li>
+    </ul>
+  </div>
+  <div class="prc-c">
+    <p class="eyebrow">Опция</p>
+    <h3>Топ города</h3>
+    <p class="prc-p">{PRICE.priority.toLocaleString('ru-RU')} ₽ <small>/ неделя</small></p>
+    <ul>
+      <li>Место в первой тройке на странице города и метро</li>
+      <li>7 дней, с понедельника по воскресенье</li>
+      <li>Всего <b>3 места</b> на город в неделю — бронируйте заранее в календаре</li>
+    </ul>
+  </div>
+</div>
+{cta && <p class="alt" style="text-align:center;margin-top:14px">Оплата картой или по счёту. Условия — в <a href="/oferta/">публичной оферте</a>.</p>}
+<style>
+.prc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:16px}
+.prc-c{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:24px;min-width:0}
+.prc-c.pro{border:2px solid var(--brass);box-shadow:var(--shadow)}
+.prc-c h3{font-size:24px;margin:4px 0}
+.prc-p{font-size:30px;font-weight:800;margin:0 0 12px}.prc-p small{font-size:15px;font-weight:500;color:var(--muted)}
+.prc-c ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.prc-c li.no{color:var(--muted);list-style:'— '}
+</style>

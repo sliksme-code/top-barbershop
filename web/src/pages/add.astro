@@ -1,29 +1,117 @@
 ---
+import Base from '../layouts/Base.astro';
 import AccountLayout from '../components/AccountLayout.astro';
 import ShopForm from '../components/ShopForm.astro';
+import Pricing from '../components/Pricing.astro';
+import Captcha from '../components/Captcha.astro';
+import '../styles/forms.css';
+import { sql } from '../lib/db';
 import { formRefs, readShopForm, saveShop } from '../lib/shopform';
 import { sameOrigin, rateLimited, captchaOk, str } from '../lib/forms';
+import { registerUser } from '../lib/register';
 import { sendMail, ADMIN_EMAIL } from '../lib/mail';
+import { shops as shopsWord } from '../lib/text';
+
 const user = Astro.locals.user;
-if (!user) return Astro.redirect('/login/?next=/add/');
-const refs = await formRefs();
-let errors: string[] = [], v: any = {}, metroSel: number[] = [];
-if (Astro.request.method === 'POST') {
+let errors: string[] = [], v: any = {}, metroSel: number[] = [], regErr = '', reg: any = {};
+
+// Гость: промо-страница с регистрацией → сразу к форме добавления
+if (!user && Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
-  const r = await readShopForm(f, refs.features);
+  reg = { name: str(f, 'name', 80), email: str(f, 'email', 120), phone: str(f, 'phone', 40) };
+  regErr = (await registerUser(f, Astro.request, Astro.cookies)) || '';
+  if (!regErr) return Astro.redirect('/add/?welcome=1#form');
+}
+
+const refs = user ? await formRefs() : null;
+if (user && Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const r = await readShopForm(f, refs!.features);
   v = r.data; metroSel = r.metroIds; errors = r.errors;
   if (!sameOrigin(Astro.request) || str(f, 'website_url')) errors.push('Обновите страницу и попробуйте снова.');
   if (rateLimited('add:' + user.id, 10, 86400)) errors.push('Слишком много новых барбершопов за сутки.');
   if (!errors.length && !(await captchaOk(f, Astro.request))) errors.push('Подтвердите, что вы не робот.');
   if (!errors.length) {
     const id = await saveShop(v, metroSel, user.id);
-    if (ADMIN_EMAIL) sendMail(ADMIN_EMAIL, `Новый барбершоп на модерации: ${v.title}`, `Пользователь ${user.email} добавил «${v.title}», ${v.address}.\nМодерация: https://cms.top-barbershop.com/admin/content/barbershops/${id}`);
+    if (ADMIN_EMAIL) sendMail(ADMIN_EMAIL, `Новый барбершоп на модерации: ${v.title}`, `Пользователь ${user.email} добавил «${v.title}», ${v.address}.\nМодерация: https://cms.new.top-barbershop.com/admin/content/barbershops/${id}`);
     return Astro.redirect('/my/?saved=new');
   }
 }
+const [stat] = user ? [null] : await sql`select count(*)::int shops, count(distinct location_id)::int cities from barbershops where status='published'`;
 ---
-<AccountLayout title="Добавить барбершоп" active="/add/">
-  {errors.length > 0 && <div class="msg err">{errors.map((e) => <div>{e}</div>)}</div>}
-  <p class="alt" style="max-width:720px">Добавление бесплатное. Барбершоп появится в каталоге после проверки. Только мужские парикмахерские и барбершопы.</p>
-  <ShopForm {refs} {v} {metroSel} submit="Отправить на модерацию" />
-</AccountLayout>
+{user ? (
+  <AccountLayout title="Добавить барбершоп" active="/add/">
+    {Astro.url.searchParams.get('welcome') && <p class="msg ok">Аккаунт создан. Заполните карточку барбершопа — это займёт 5 минут.</p>}
+    {errors.length > 0 && <div class="msg err">{errors.map((e) => <div>{e}</div>)}</div>}
+    <p class="alt" style="max-width:720px" id="form">Добавление бесплатное. Барбершоп появится в каталоге после проверки. Только мужские парикмахерские и барбершопы. Телефон, сайт и онлайн-запись доступны на <a href="/tarify/">тарифе PRO</a> — подключить его можно после публикации.</p>
+    <ShopForm refs={refs} {v} {metroSel} submit="Отправить на модерацию" />
+  </AccountLayout>
+) : (
+  <Base title="Добавить барбершоп в каталог бесплатно — TOP BARBERSHOP" description={`Разместите барбершоп в крупнейшем каталоге России и СНГ: ${stat.shops} барбершопов в ${stat.cities} городах. Бесплатная карточка, тариф PRO с телефоном и онлайн-записью, топ города.`}>
+    <section class="pr-hero">
+      <div class="wrap pr-in">
+        <div class="pr-txt">
+          <p class="eyebrow">Для владельцев барбершопов</p>
+          <h1>Клиенты ищут барбершоп у метро. Будьте там, где вас ищут</h1>
+          <p class="pr-lead">TOP BARBERSHOP — каталог, где мужчины выбирают, куда пойти стричься: по городу, станции метро, ценам и отзывам. Карточка барбершопа — бесплатно.</p>
+          <ul class="pr-stats">
+            <li><b>{stat.shops.toLocaleString('ru-RU')}</b><span>барбершопов в каталоге</span></li>
+            <li><b>{stat.cities}</b><span>городов России и СНГ</span></li>
+            <li><b>с 2016</b><span>года в поиске Яндекса и Google</span></li>
+          </ul>
+        </div>
+        <form method="post" class="pr-form frm" id="register">
+          <h2>Зарегистрируйтесь и добавьте барбершоп</h2>
+          {regErr && <p class="msg err">{regErr}</p>}
+          <label>Ваше имя <input class="field" name="name" maxlength="80" autocomplete="name" value={reg.name} /></label>
+          <label>E-mail <input class="field" name="email" type="email" required autocomplete="email" value={reg.email} /></label>
+          <label>Телефон <small>для связи с вами, не публикуется</small><input class="field" name="phone" maxlength="40" inputmode="tel" autocomplete="tel" value={reg.phone} /></label>
+          <label>Пароль <small>не короче 8 символов</small><input class="field" name="password" type="password" required minlength="8" autocomplete="new-password" /></label>
+          <label class="check"><input type="checkbox" name="agree" required /> <span>Принимаю <a href="/policy/" target="_blank">правила и политику обработки данных</a></span></label>
+          <Captcha />
+          <button class="btn brass">Продолжить — это бесплатно</button>
+          <p class="alt" style="margin:0">Уже есть аккаунт? <a href="/login/?next=/add/">Войдите</a>. Ваш барбершоп уже в каталоге? Откройте его карточку и нажмите «Это мой барбершоп».</p>
+        </form>
+      </div>
+    </section>
+    <div class="wrap">
+      <section class="section">
+        <h2>Как это работает</h2>
+        <ol class="steps">
+          <li><b>Регистрация</b><span>Одна минута — e-mail и пароль.</span></li>
+          <li><b>Карточка</b><span>Адрес на карте, метро, фото, описание, цены и часы работы.</span></li>
+          <li><b>Проверка</b><span>Модератор публикует барбершоп обычно в течение суток.</span></li>
+          <li><b>Клиенты</b><span>Подключите PRO — и вам звонят и записываются онлайн прямо из карточки.</span></li>
+        </ol>
+      </section>
+      <section class="section">
+        <div class="section-head"><h2>Тарифы</h2></div>
+        <Pricing />
+      </section>
+      <section class="section faq">
+        <h2>Вопросы</h2>
+        <details><summary>Сколько стоит размещение?</summary><p>Базовая карточка бесплатна навсегда: адрес, фото, описание, цены, отзывы. Телефон, кнопка онлайн-записи и ссылки на сайт — на тарифе PRO за 1 990 ₽ в месяц.</p></details>
+        <details><summary>Что такое «Топ города»?</summary><p>Ваш барбершоп показывается в первой тройке на странице города и на страницах станций метро в течение недели. В каждом городе всего 3 места в неделю — свободные недели видны в календаре в личном кабинете.</p></details>
+        <details><summary>Мой барбершоп уже есть в каталоге</summary><p>Зарегистрируйтесь, откройте его карточку и нажмите «Это мой барбершоп» — после проверки вы сможете редактировать её и подключить PRO.</p></details>
+        <details><summary>У меня сеть барбершопов</summary><p>Добавьте каждый филиал отдельно — у каждого будет своя карточка, адрес на карте и отзывы. Тариф PRO подключается для каждого филиала.</p></details>
+      </section>
+      <p style="text-align:center"><a class="btn brass" href="#register">Добавить барбершоп</a></p>
+    </div>
+  </Base>
+)}
+<style>
+.pr-hero{background:radial-gradient(1000px 500px at 90% -20%,#3a2c18 0,transparent 60%),var(--ink);color:#f3ede4;padding:56px 0}
+.pr-in{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:40px;align-items:start}
+.pr-txt h1{color:#fff}.pr-lead{font-size:19px;color:#cfc6b9;max-width:620px}
+.pr-stats{list-style:none;padding:0;margin:28px 0 0;display:flex;gap:28px;flex-wrap:wrap}
+.pr-stats b{display:block;font-size:32px;color:var(--brass2);line-height:1.1}.pr-stats span{font-size:14px;color:#b9b0a3}
+.pr-form{background:#fff;color:var(--ink);border-radius:18px;padding:26px;max-width:none;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.pr-form h2{font-size:22px;margin:0}
+.steps{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:14px;counter-reset:s}
+.steps li{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:20px;display:grid;gap:6px;counter-increment:s;min-width:0}
+.steps li::before{content:counter(s);width:36px;height:36px;border-radius:50%;background:var(--ink);color:var(--brass2);display:grid;place-items:center;font-weight:800}
+.steps span{color:var(--muted)}
+.faq details{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 18px;margin-bottom:8px;max-width:820px}
+.faq summary{font-weight:700;cursor:pointer}.faq p{margin:10px 0 0;color:var(--ink2)}
+@media (max-width:900px){.pr-in{grid-template-columns:1fr}.pr-hero{padding:36px 0}}
+</style>

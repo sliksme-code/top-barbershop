@@ -9,7 +9,7 @@ const { parts, page } = splitPage(Astro.params.path);
 const path = parts.join('/');
 const [loc] = await sql`select * from locations where path = ${path}`;
 if (!loc) return Astro.rewrite('/404/');
-const data = await listShops(inLocation(path), page);
+const data = await listShops(inLocation(path), page, undefined, true);
 if (page > data.pages) return Astro.rewrite('/404/');
 const points = page === 1 ? await mapPoints(inLocation(path)) : [];
 const all = await locationCounts();

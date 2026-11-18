@@ -5,22 +5,26 @@ export const PER_PAGE = 24;
 export type Card = {
   id: number; slug: string; title: string; cover: string | null; rating: number | null; reviews_count: number;
   closed: boolean; featured: boolean; address: string | null; price: string | null; city: string | null; city_path: string | null; metro: string | null;
-  lat: number | null; lng: number | null;
+  lat: number | null; lng: number | null; prio?: boolean;
 };
 
 const cardSelect = sql`
   b.id, b.slug, b.title, coalesce(b.cover_image, b.gallery->>0) as cover, b.rating::float as rating, coalesce(b.reviews_count,0) as reviews_count,
   coalesce(b.closed,false) as closed, coalesce(b.featured,false) as featured, b.address, b.services->>'strizh' as price,
   l.name as city, l.path as city_path, b.lat, b.lng,
+  exists (select 1 from priority_slots ps where ps.barbershop_id = b.id and ps.status = 'paid' and current_date between ps.week_start and ps.week_start + 6) as prio,
   (select string_agg(m.name, ', ' order by m.name) from barbershop_metro bm join metro m on m.id = bm.metro_id where bm.barbershop_id = b.id) as metro`;
 
-const order = sql`order by coalesce(b.closed,false), coalesce(b.featured,false) desc, b.rating desc nulls last, b.reviews_count desc nulls last, b.views desc nulls last, b.id desc`;
+const prioFirst = sql`exists (select 1 from priority_slots ps where ps.barbershop_id = b.id and ps.status = 'paid' and current_date between ps.week_start and ps.week_start + 6) desc,`;
+const orderBy = (prio: boolean) => sql`order by ${prio ? prioFirst : sql``} coalesce(b.closed,false), coalesce(b.featured,false) desc, b.rating desc nulls last, b.reviews_count desc nulls last, b.views desc nulls last, b.id desc`;
 
 /** Список карточек с пагинацией. where — фрагмент sql`...` без слова WHERE. */
-export async function listShops(where: any, page = 1, perPage = PER_PAGE) {
+/** prio = поднимать оплаченный приоритет (страницы города и метро) */
+export async function listShops(where: any, page = 1, perPage = PER_PAGE, prio = false) {
   const [{ n }] = await sql`select count(*)::int as n from barbershops b left join locations l on l.id = b.location_id where b.status = 'published' and ${where}`;
   const items = await sql<Card[]>`select ${cardSelect} from barbershops b left join locations l on l.id = b.location_id
-    where b.status = 'published' and ${where} ${order} limit ${perPage} offset ${(page - 1) * perPage}`;
+    where b.status = 'published' and ${where} ${orderBy(prio)} limit ${perPage} offset ${(page - 1) * perPage}`;
+  if (!prio) for (const it of items) it.prio = false; // метка «Топ города» — только там, где он реально поднят
   return { total: n as number, items, pages: Math.max(1, Math.ceil(n / perPage)) };
 }
 

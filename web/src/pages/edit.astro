@@ -4,17 +4,19 @@ import ShopForm from '../components/ShopForm.astro';
 import { sql } from '../lib/db';
 import { formRefs, readShopForm, saveShop, canEdit } from '../lib/shopform';
 import { sameOrigin } from '../lib/forms';
+import { isPro } from '../lib/billing';
 const user = Astro.locals.user;
 const id = Number(Astro.url.searchParams.get('id')) || 0;
 if (!user) return Astro.redirect('/login/?next=' + encodeURIComponent(`/edit/?id=${id}`));
 const [shop] = id ? await sql`select * from barbershops where id = ${id}` : [];
 if (!shop || !canEdit(user, shop)) return Astro.redirect('/my/');
 const refs = await formRefs();
+const pro = isPro(shop) || ['administrator', 'editor'].includes(user.role || '');
 let errors: string[] = [], v: any = shop;
 let metroSel: number[] = (await sql`select metro_id from barbershop_metro where barbershop_id = ${id}`).map((r) => r.metro_id);
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
-  const r = await readShopForm(f, refs.features, shop);
+  const r = await readShopForm(f, refs.features, shop, pro);
   errors = r.errors;
   if (!sameOrigin(Astro.request)) errors.push('Обновите страницу и попробуйте снова.');
   if (!errors.length) { await saveShop(r.data, r.metroIds, user.id, id); return Astro.redirect('/my/?saved=1'); }
@@ -24,5 +26,5 @@ if (Astro.request.method === 'POST') {
 <AccountLayout title={`Редактирование: ${shop.title}`} active="/my/">
   {errors.length > 0 && <div class="msg err">{errors.map((e) => <div>{e}</div>)}</div>}
   {shop.status === 'published' && <p class="alt"><a href={`/place/${shop.slug}/`} target="_blank">Открыть карточку на сайте →</a></p>}
-  <ShopForm {refs} {v} {metroSel} />
+  <ShopForm {refs} {v} {metroSel} {pro} />
 </AccountLayout>

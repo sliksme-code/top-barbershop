@@ -3,6 +3,7 @@
 import Base from '../layouts/Base.astro';
 import Crumbs from '../components/Crumbs.astro';
 import PostCard from '../components/PostCard.astro';
+import Requisites from '../components/Requisites.astro';
 import { sql } from '../lib/db';
 import { img } from '../lib/img';
 import { breadcrumbLd, abs } from '../lib/seo';
@@ -15,6 +16,8 @@ if (parts.length === 2 && /^(amp|feed|embed|trackback|\d+|comment-page-\d+)$/.te
 if (parts.length !== 1) return Astro.rewrite('/404/');
 const slug = decodeURIComponent(parts[0]);
 if (slug === 'home') return Astro.redirect('/', 301);
+if (slug === 'owners') return Astro.redirect('/add/', 301);
+if (slug === 'faq') return Astro.redirect('/tarify/', 301);
 
 const DASHBOARD = ['my-watchdogs', 'setup', 'invoices', 'transactions', 'payment', 'remove', 'dobavit-vakansiyu'];
 const [post] = await sql`select p.*, (select json_agg(json_build_object('slug', c.slug, 'name', c.name)) from post_categories pc join categories c on c.id = pc.category_id where pc.post_id = p.id) cats from posts p where p.slug = ${slug} and p.status = 'published'`;
@@ -48,7 +51,9 @@ if (post) ld.push({ '@context': 'https://schema.org', '@type': 'BlogPosting', he
         {post?.cover_image && !String(post.content || '').includes(String(post.cover_image).split('/').pop()) && (
           <img class="art-cover" src={img(post.cover_image, 1200, 0, 'fit')} alt={post.title} loading="eager" onerror="this.remove()" />
         )}
+        {slug === 'policy' && <p class="prose"><b>Оператор персональных данных и администратор сервиса TOP BARBERSHOP — ИП Галиуллин Марат Рамилевич (ИНН 165710584907, ОГРНИП 310169034800140).</b></p>}
         <div class="prose" set:html={cleanHtml(it.content)} />
+        {['policy', 'contact', 'about'].includes(slug) && <Requisites />}
       </article>
     )}
     {related.length > 0 && (

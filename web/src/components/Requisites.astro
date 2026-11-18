@@ -1,0 +1,8 @@
+---
+import { SELLER } from '../lib/billing';
+---
+<section class="req panel">
+  <h2 class="h3">Реквизиты</h2>
+  <p>{SELLER.name}<br />ИНН {SELLER.inn}<br />ОГРНИП {SELLER.ogrnip}<br />E-mail: <a href={`mailto:${SELLER.email}`}>{SELLER.email}</a></p>
+</section>
+<style>.req{margin:28px 0;max-width:760px}.req p{margin:0;line-height:1.8}</style>

@@ -5,7 +5,7 @@ import { sql } from '../lib/db';
 import { img } from '../lib/img';
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login/?next=/my/');
-const shops = await sql`select b.id, b.slug, b.title, b.status, b.address, coalesce(b.cover_image, b.gallery->>0) cover, l.name city, b.rating::float rating, b.reviews_count
+const shops = await sql`select b.id, b.slug, b.title, b.status, b.address, coalesce(b.cover_image, b.gallery->>0) cover, l.name city, b.rating::float rating, b.reviews_count, (b.pro_until > now()) as pro
   from barbershops b left join locations l on l.id = b.location_id where (b.owner_id = ${user.id} or b.submitted_by = ${user.id}) and b.status <> 'trash' order by b.title`;
 const claims = await sql`select c.status, b.title, b.slug from claims c join barbershops b on b.id = c.barbershop_id where c.user_id = ${user.id} and c.status <> 'approved' order by c.created_at desc`;
 const st: Record<string, string> = { published: 'Опубликован', pending: 'На модерации', draft: 'Черновик' };
@@ -31,7 +31,7 @@ const saved = Astro.url.searchParams.get('saved');
             <span class="muted">{[s.city, s.address].filter(Boolean).join(', ')}</span>
             <span><span class={`badge ${s.status === 'published' ? 'top' : ''}`}>{st[s.status] || s.status}</span> {s.rating ? `★ ${s.rating.toFixed(1)} · отзывов: ${s.reviews_count}` : ''}</span>
           </div>
-          <a class="btn sm" href={`/edit/?id=${s.id}`}>Редактировать</a>
+          <div class="my-a"><a class="btn sm" href={`/edit/?id=${s.id}`}>Редактировать</a><a class="btn ghost sm" href={`/billing/?id=${s.id}`}>{s.pro ? 'PRO ✓' : 'Подключить PRO'}</a></div>
         </div>
       ))}
     </div>
@@ -42,6 +42,7 @@ const saved = Astro.url.searchParams.get('saved');
 .my{display:grid;gap:12px;max-width:900px}
 .my-i{display:flex;gap:16px;align-items:center}
 .my-i img{width:120px;height:80px;object-fit:cover;border-radius:8px;flex:none}
+.my-a{display:flex;gap:6px;flex-wrap:wrap}
 .my-b{display:grid;gap:3px;flex:1;min-width:0}.my-b a{text-decoration:none}
 .my-i .badge{background:var(--line)}.my-i .badge.top{background:var(--brass)}
 @media (max-width:600px){.my-i{flex-wrap:wrap}.my-i img{width:100%;height:auto;aspect-ratio:3/2}}
