@@ -1,0 +1,17 @@
+name: seo-crawl
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node scripts/seo-crawl.mjs
+      - name: результаты во временную ветку seo-report (публичные данные сайта)
+        run: |
+          mkdir out && mv seo-*.json out/ && cd out && git init -q && git checkout -q -b seo-report && git add . && git -c user.name=ci -c user.email=ci@local commit -qm report
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" seo-report
