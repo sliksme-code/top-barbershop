@@ -14,7 +14,8 @@ interface Props {
 }
 const { h1, title, description, crumbs, base, page, data, points = [], intro, noindex = false, query = '', eyebrow } = Astro.props;
 const t = page > 1 ? `${title} — страница ${page}` : title;
-const canonical = new URL((page > 1 ? `${base}page/${page}/` : base), Astro.site).href;
+// Пагинация: canonical на первую страницу (рекомендация Яндекса), номер страницы — в title
+const canonical = new URL(base, Astro.site).href;
 ---
 <Base title={t} description={description} canonical={canonical} noindex={noindex} jsonLd={breadcrumbLd(crumbs)}>
   <div class="wrap">
@@ -26,7 +27,7 @@ const canonical = new URL((page > 1 ? `${base}page/${page}/` : base), Astro.site
       <slot name="chips" />
     </header>
     {page === 1 && points.length > 0 && <div class="lst-map"><YMap points={points} /></div>}
-    <div class="grid">{data.items.map((s, i) => <ShopCard s={s} eager={i < 3} />)}</div>
+    <div class="grid">{data.items.map((s, i) => <ShopCard s={s} eager={i < 3} level={2} />)}</div>
     <Pager base={base} page={page} pages={data.pages} query={query} />
     {page === 1 && intro && <section class="prose lst-intro" set:html={intro} />}
     <slot />

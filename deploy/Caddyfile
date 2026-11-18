@@ -25,6 +25,10 @@
 			file_server
 		}
 	}
+	handle_path /logos/* {
+		root * /srv/logos
+		file_server
+	}
 	handle_path /wp-content/uploads/* {
 		root * /srv/uploads
 		# служебные файлы, случайно попавшие в uploads, не отдаём
@@ -45,6 +49,9 @@
 		header Cache-Control "public, max-age=31536000, immutable"
 		reverse_proxy web:4321
 	}
+	redir /index.php / 301
+	@page1 path_regexp page1 ^(.*/)page/1/?$
+	redir @page1 {re.page1.1} 301
 	redir /feed /feed/ 301
 	rewrite /feed/ /feed.xml
 	redir /sitemap_index.xml /sitemap.xml 301
@@ -72,6 +79,11 @@
 
 {$PROD_DOMAIN} {
 	import newsite
+}
+
+# Главное зеркало: https://top-barbershop.com — один 301 с любых http/www
+http://{$PROD_DOMAIN}, http://www.{$PROD_DOMAIN} {
+	redir https://{$PROD_DOMAIN}{uri} 301
 }
 
 # Тестовый домен — тот же сайт, но noindex (решает приложение по имени хоста)

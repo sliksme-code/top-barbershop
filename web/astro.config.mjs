@@ -1,7 +1,8 @@
 import { defineConfig } from 'astro/config';
 import node from '@astrojs/node';
 
-const SITE = process.env.SITE_URL || 'https://top-barbershop.com';
+// Канонический домен всегда боевой (тестовый new.* закрыт noindex по имени хоста)
+const SITE = 'https://top-barbershop.com';
 
 export default defineConfig({
   security: { checkOrigin: false },

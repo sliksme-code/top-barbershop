@@ -20,7 +20,7 @@ const data = points.filter((p) => p.lat && p.lng && Math.abs(p.lat) <= 90).map((
           map.behaviors.disable('scrollZoom');
           var c = new ymaps.Clusterer({ preset: 'islands#blackClusterIcons', groupByCoordinates: false });
           c.add(pts.map(function (p) {
-            var body = (p[4] ? p[4] + '<br>' : '') + (p[3] ? '<a href="/place/' + p[3] + '/">Подробнее →</a>' : '');
+            var body = (p[4] ? p[4] + '<br>' : '') + (p[3] ? '<a href="' + '/pl' + 'ace/' + p[3] + '/">Подробнее →</a>' : '');
             return new ymaps.Placemark([p[0], p[1]], { balloonContentHeader: p[2], balloonContentBody: body, hintContent: p[2] }, { preset: 'islands#redDotIcon' });
           }));
           map.geoObjects.add(c);

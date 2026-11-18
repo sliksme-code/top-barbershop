@@ -5,7 +5,7 @@ import Simple from '../../components/Simple.astro';
 import { sql } from '../../lib/db';
 import { img } from '../../lib/img';
 import { breadcrumbLd } from '../../lib/seo';
-import { cleanHtml, strip, clip, phoneHref, ensureUrl } from '../../lib/text';
+import { cleanHtml, strip, clip, phoneHref, ensureUrl, fillAlt } from '../../lib/text';
 const parts = (Astro.params.p || '').split('/').filter(Boolean);
 let city: any = null;
 if (parts[0] === 'school-city' && parts[1]) { [city] = await sql`select * from school_cities where slug = ${parts[1]}`; if (!city) return Astro.rewrite('/404/'); }
@@ -31,7 +31,7 @@ const facts: [string, string | null][] = x ? ('school' === 'school'
         <article>
           <h1>{x.title}</h1>
           {x.cover_image && <img class="sx-cover" src={img(x.cover_image, 1000, 0, 'fit')} alt={x.title} onerror="this.remove()" />}
-          <div class="prose" set:html={cleanHtml(x.content)} />
+          <div class="prose" set:html={fillAlt(cleanHtml(x.content), x.title)} />
         </article>
         <aside class="panel">
           <dl class="sx-dl">{facts.filter(([, v]) => v).map(([k, v]) => <><dt>{k}</dt><dd>{v === "on" ? "Да" : v}</dd></>)}</dl>

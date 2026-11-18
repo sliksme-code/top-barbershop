@@ -58,7 +58,7 @@ const jsonLd = [
       <div class="chains">
         {chains.map((c) => (
           <a href={`/all/${c.slug}/`} class="chain">
-            {c.image ? <img src={img(c.image, 160, 160, 'fit')} alt="" width="56" height="56" loading="lazy" onerror="this.remove()" /> : <span class="chain-l">{c.name.slice(0, 1)}</span>}
+            {c.image ? <img src={img(c.image, 160, 160, 'fit')} alt={`Логотип ${c.name}`} width="56" height="56" loading="lazy" onerror="this.remove()" /> : <span class="chain-l">{c.name.slice(0, 1)}</span>}
             <span><b>{c.name}</b><small>{shops(c.n)}</small></span>
           </a>
         ))}

@@ -28,8 +28,8 @@ jobs:
           context: ./web
           push: true
           build-args: |
-            SITE_URL=https://${{ vars.SITE_DOMAIN || 'new.top-barbershop.com' }}
-            SITE_ENV=${{ vars.SITE_ENV || 'staging' }}
+            SITE_URL=https://top-barbershop.com
+            SITE_ENV=production
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}

@@ -19,6 +19,9 @@ export const cleanHtml = (html?: string | null) =>
     .replace(/https?:\/\/(www\.)?top-barbershop\.com\/wp-content\/uploads\//g, '/media/')
     .replace(/https?:\/\/(www\.)?top-barbershop\.com\//g, '/')
     .replace(/\[\/?[a-z_-]+[^\]]*\]/gi, '')
+    .replace(/<(\/?)h1(\s|>)/gi, '<$1h2$2')
     .replace(/<img /g, '<img loading="lazy" ');
+export const fillAlt = (html: string, alt: string) =>
+  html.replace(/<img\b([^>]*)>/gi, (m, a) => (/\balt="[^"]+"/.test(a) ? m : `<img alt="${alt.replace(/"/g, '&quot;')}"${a.replace(/\salt=""/, '')}>`));
 export const phoneHref = (p?: string | null) => (p ? 'tel:' + p.replace(/[^\d+]/g, '') : null);
 export const ensureUrl = (u?: string | null) => (!u ? null : /^https?:\/\//.test(u) ? u : 'https://' + u.replace(/^\/+/, ''));

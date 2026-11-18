@@ -7,7 +7,7 @@ import { sql } from '../../lib/db';
 import { featureLabels, type Card } from '../../lib/catalog';
 import { img, rel } from '../../lib/img';
 import { breadcrumbLd, abs } from '../../lib/seo';
-import { cleanHtml, strip, clip, rub, phoneHref, ensureUrl, dateRu, plural } from '../../lib/text';
+import { cleanHtml, strip, clip, rub, phoneHref, ensureUrl, dateRu, plural, fillAlt, shops as shopsWord } from '../../lib/text';
 import { site } from '../../data/site';
 import { inCity } from '../../lib/cases';
 import Captcha from '../../components/Captcha.astro';
@@ -22,7 +22,11 @@ const [s] = await sql`select b.*, b.rating::float as rating_f, l.name as city, l
   c.name as chain_name, c.slug as chain_slug
   from barbershops b left join locations l on l.id = b.location_id left join chains c on c.id = b.chain_id
   where b.slug = ${slug} and b.status = 'published'`;
-if (!s) return Astro.rewrite('/404/');
+if (!s) {
+  const [m] = await sql`select t.slug from barbershops b join barbershops t on t.id = b.merged_into and t.status = 'published' where b.slug = ${slug} and b.status = 'merged'`;
+  if (m) return Astro.redirect(`/place/${m.slug}/`, 301);
+  return Astro.rewrite('/404/');
+}
 
 const [metros, colls, reviews, labels, country] = await Promise.all([
   sql`select m.slug, m.name from barbershop_metro bm join metro m on m.id = bm.metro_id where bm.barbershop_id = ${s.id} order by m.name`,
@@ -51,7 +55,12 @@ const rating = s.rating_f ? Math.round(s.rating_f * 10) / 10 : null;
 const metroNames = metros.map((m) => m.name.replace(/\s*\((Мск|СПб|Спб)\)/, ''));
 const descText = strip(s.description);
 const strizh = s.services?.strizh ? rub(s.services.strizh) : null;
-const title = s.seo_title || `${s.title} — барбершоп${s.city ? ' ' + inCity(s.city).replace(/^— /, ', ') : ''}${metroNames[0] ? ', м. ' + metroNames[0] : ''}: цены, отзывы, запись`;
+const cityRe = s.city ? new RegExp('^(г\\.?\\s*|город\\s*)?' + s.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*,?\\s*', 'i') : null;
+const street = (cityRe ? (s.address || '').replace(cityRe, '') : s.address || '').replace(/^(г\.?|город)\s*[^,]+,\s*/i, '').split(',').slice(0, 2).join(',').trim();
+const place = metroNames[0] ? `м. ${metroNames[0]}` : street;
+const head = `${s.title} — барбершоп${s.city ? ' ' + inCity(s.city).replace(/^— /, ', ') : ''}`;
+const titleCore = place && (head + ', ' + place).length <= 72 ? `${head}, ${place}` : head;
+const title = s.seo_title || [': цены, отзывы, запись', ': цены и отзывы', ''].map((x) => titleCore + x).find((t) => t.length <= 75) || titleCore;
 const description = clip(s.seo_description || [`${s.title} — барбершоп${s.address ? ' по адресу ' + s.address : ''}${s.city ? ', ' + s.city : ''}.`, strizh ? `Мужская стрижка — ${strizh}.` : '', descText].filter(Boolean).join(' '), 200);
 const crumbs: [string, string?][] = [['Главная', '/']];
 if (country) crumbs.push([country.name, `/location/${country.path}/`]);
@@ -132,9 +141,14 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
         {s.description && (
           <section class="panel">
             <h2>О барбершопе</h2>
-            <div class="prose" set:html={cleanHtml(s.description)} />
+            <div class="prose" set:html={fillAlt(cleanHtml(s.description), s.title)} />
           </section>
         )}
+        <section class="panel">
+          <h2>Коротко о {s.title}</h2>
+          <p>{s.title} — {s.chain_name && /\p{L}/u.test(s.chain_name) ? `барбершоп сети ${s.chain_name}` : 'барбершоп'}{s.city ? ` в городе ${s.city}` : ''}{s.address ? `, адрес: ${s.address}` : ''}{metroNames.length ? `, рядом ${metroNames.length > 1 ? 'со станциями' : 'со станцией'} метро ${metroNames.join(', ')}` : ''}.{strizh ? ` Мужская стрижка стоит ${strizh}` : ''}{services.length > 1 ? `${strizh ? ',' : ''} всего в прайсе ${services.length} ${plural(services.length, 'услуга', 'услуги', 'услуг')}` : ''}{strizh || services.length > 1 ? '.' : ''}{hours.length ? (sameHours ? ` Работает ежедневно с ${hours[0].from} до ${hours[0].to}.` : ` Работает ${hours.length} ${plural(hours.length, 'день', 'дня', 'дней')} в неделю.`) : ''}{rating && reviews.length ? ` Средняя оценка посетителей — ${rating.toFixed(1)} из 5 по ${reviews.length} ${plural(reviews.length, 'отзыву', 'отзывам', 'отзывам')}.` : ''}{amenities.length ? ` Для гостей: ${amenities.slice(0, 4).join(', ').toLowerCase()}.` : ''}</p>
+          {near.length > 0 && <p class="muted">Рядом ещё {shopsWord(near.length)} — смотрите блок ниже{s.city_path ? <> или <a href={`/location/${s.city_path}/`}>все барбершопы {s.city ? inCity(s.city).replace(/^— /, '') : ''}</a></> : ''}.</p>}
+        </section>
         {amenities.length > 0 && (
           <section class="panel">
             <h2>Удобства</h2>

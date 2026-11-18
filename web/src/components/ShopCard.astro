@@ -2,7 +2,8 @@
 import { img } from '../lib/img';
 import { rub } from '../lib/text';
 import type { Card } from '../lib/catalog';
-const { s, eager = false } = Astro.props as { s: Card; eager?: boolean };
+const { s, eager = false, level = 3 } = Astro.props as { s: Card; eager?: boolean; level?: 2 | 3 };
+const H = level === 2 ? 'h2' : 'h3';
 const r = s.rating ? Math.round(s.rating * 10) / 10 : null;
 ---
 <article class={`card${s.closed ? ' is-closed' : ''}`}>
@@ -11,7 +12,7 @@ const r = s.rating ? Math.round(s.rating * 10) / 10 : null;
     {s.closed ? <span class="badge closed">Закрыт</span> : s.prio ? <span class="badge top" title="Платное размещение в топе города">Топ города</span> : s.featured ? <span class="badge top">Рекомендуем</span> : null}
   </a>
   <div class="card-body">
-    <h3><a href={`/place/${s.slug}/`}>{s.title}</a></h3>
+    <H class="card-t"><a href={`/place/${s.slug}/`}>{s.title}</a></H>
     <p class="card-loc">{[s.city, s.metro ? 'м. ' + s.metro.replace(/\s*\((Мск|СПб|Спб)\)/g, '') : null].filter(Boolean).join(' · ')}</p>
     {s.address && <p class="card-addr">{s.address}</p>}
     <div class="card-meta">
@@ -28,8 +29,8 @@ const r = s.rating ? Math.round(s.rating * 10) / 10 : null;
 .card-img .badge{position:absolute;left:12px;top:12px}
 .is-closed .card-img img{filter:grayscale(1);opacity:.7}
 .card-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:4px;flex:1}
-.card h3{margin:0;font-size:17px}
-.card h3 a{text-decoration:none}.card h3 a:hover{color:var(--red)}
+.card-t{margin:0;font-size:17px;letter-spacing:-.01em}
+.card-t a{text-decoration:none}.card-t a:hover{color:var(--red)}
 .card-loc{margin:0;font-size:14px;color:var(--brass);font-weight:600;overflow-wrap:anywhere}
 .card-addr{margin:0;font-size:14px;color:var(--muted)}
 .card-meta{margin-top:auto;padding-top:10px;display:flex;justify-content:space-between;gap:8px;font-size:14px;flex-wrap:wrap}

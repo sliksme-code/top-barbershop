@@ -18,6 +18,7 @@ services:
       - ./deploy:/etc/caddy/deploy:ro   # папка, а не файлы: иначе после обновления Caddy видит старую версию
       - media:/srv/media:ro
       - ./legacy/uploads:/srv/uploads:ro   # фото старого сайта (/media/... = /wp-content/uploads/...)
+      - ./legacy/logos:/srv/logos:ro       # логотипы для партнёров (/logo/)
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [web, directus]

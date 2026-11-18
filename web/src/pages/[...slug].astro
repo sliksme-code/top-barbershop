@@ -7,7 +7,7 @@ import Requisites from '../components/Requisites.astro';
 import { sql } from '../lib/db';
 import { img } from '../lib/img';
 import { breadcrumbLd, abs } from '../lib/seo';
-import { cleanHtml, strip, clip, dateRu } from '../lib/text';
+import { cleanHtml, strip, clip, dateRu, fillAlt } from '../lib/text';
 
 const parts = (Astro.params.slug || '').split('/').filter(Boolean);
 if (!parts.length) return Astro.rewrite('/404/');
@@ -52,7 +52,7 @@ if (post) ld.push({ '@context': 'https://schema.org', '@type': 'BlogPosting', he
           <img class="art-cover" src={img(post.cover_image, 1200, 0, 'fit')} alt={post.title} loading="eager" onerror="this.remove()" />
         )}
         {slug === 'policy' && <p class="prose"><b>Оператор персональных данных и администратор сервиса TOP BARBERSHOP — ИП Галиуллин Марат Рамилевич (ИНН 165710584907, ОГРНИП 310169034800140).</b></p>}
-        <div class="prose" set:html={cleanHtml(it.content)} />
+        <div class="prose" set:html={fillAlt(cleanHtml(it.content), it.title)} />
         {['policy', 'contact', 'about'].includes(slug) && <Requisites />}
       </article>
     )}

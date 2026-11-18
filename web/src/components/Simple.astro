@@ -10,7 +10,7 @@ import { strip, clip } from '../lib/text';
       {x.cover_image && <a href={`/${kind}/${x.slug}/`}><img src={img(x.cover_image, 600, 340)} alt={x.title} width="600" height="340" loading="lazy" onerror="this.remove()" /></a>}
       <div>
         {x.city && <p class="eyebrow">{x.city}</p>}
-        <h3><a href={`/${kind}/${x.slug}/`}>{x.title}</a></h3>
+        <h2 class="cs-t"><a href={`/${kind}/${x.slug}/`}>{x.title}</a></h2>
         {kind === 'vacancy' ? <p class="muted">{[x.barbershop_name, x.salary].filter(Boolean).join(' · ')}</p> : <p class="muted">{[x.duration && 'Длительность: ' + x.duration, x.address].filter(Boolean).join(' · ')}</p>}
         <p>{clip(strip(x.content), 150)}</p>
       </div>
@@ -20,6 +20,6 @@ import { strip, clip } from '../lib/text';
 <style>
 .card-s{background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;min-width:0}
 .card-s img{width:100%;aspect-ratio:600/340;object-fit:cover}
-.card-s>div{padding:14px 16px}.card-s h3 a{text-decoration:none}.card-s h3 a:hover{color:var(--red)}
+.card-s>div{padding:14px 16px}.cs-t{font-size:18px;margin:0 0 6px}.cs-t a{text-decoration:none}.cs-t a:hover{color:var(--red)}
 .card-s p{margin:0 0 6px;font-size:15px}
 </style>
