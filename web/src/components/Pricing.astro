@@ -26,6 +26,17 @@ const { cta = true } = Astro.props;
       <li><b>Кнопка «Записаться онлайн»</b> — YCLIENTS, DIKIDI и др.</li>
       <li><b>Ссылки на сайт</b> и соцсети</li>
     </ul>
+    <p class="prc-d">Оплата вперёд: <b>6 мес — −15%</b> ({Math.round(PRICE.pro * 0.85).toLocaleString('ru-RU')} ₽/мес), <b>12 мес — −25%</b> ({Math.round(PRICE.pro * 0.75).toLocaleString('ru-RU')} ₽/мес)</p>
+  </div>
+  <div class="prc-c">
+    <p class="eyebrow">Для сетей</p>
+    <h3>PRO для сети</h3>
+    <p class="prc-p">{PRICE.proNetwork.toLocaleString('ru-RU')} ₽ <small>/ мес за филиал</small></p>
+    <ul>
+      <li>Всё из PRO для каждого филиала</li>
+      <li>От <b>2 филиалов</b> в одном заказе</li>
+      <li>Скидки за оплату вперёд суммируются: 12 мес — {Math.round(PRICE.proNetwork * 0.75).toLocaleString('ru-RU')} ₽/мес за филиал</li>
+    </ul>
   </div>
   <div class="prc-c">
     <p class="eyebrow">Опция</p>
@@ -40,11 +51,12 @@ const { cta = true } = Astro.props;
 </div>
 {cta && <p class="alt" style="text-align:center;margin-top:14px">Оплата картой или по счёту. Условия — в <a href="/oferta/">публичной оферте</a>.</p>}
 <style>
-.prc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:16px}
+.prc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr));gap:16px}
 .prc-c{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:24px;min-width:0}
 .prc-c.pro{border:2px solid var(--brass);box-shadow:var(--shadow)}
 .prc-c h3{font-size:24px;margin:4px 0}
 .prc-p{font-size:30px;font-weight:800;margin:0 0 12px}.prc-p small{font-size:15px;font-weight:500;color:var(--muted)}
 .prc-c ul{margin:0;padding-left:18px;display:grid;gap:6px}
+.prc-d{margin:14px 0 0;font-size:14px;background:#fffaf0;border-radius:8px;padding:8px 10px}
 .prc-c li.no{color:var(--muted);list-style:'— '}
 </style>

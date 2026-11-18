@@ -4,8 +4,8 @@ import '../styles/forms.css';
 import { sql } from '../lib/db';
 import { sameOrigin, str } from '../lib/forms';
 import { sendMail, ADMIN_EMAIL } from '../lib/mail';
-import { PRICE, PRO_PERIODS, SELLER, isPro, priorityCalendar, createProOrder, reservePriority, startPayment, paymentsEnabled, syncPayment, weekLabel } from '../lib/billing';
-import { dateRu } from '../lib/text';
+import { PRICE, PRO_PERIODS, SELLER, NETWORK_MIN, proQuote, isPro, priorityCalendar, createProOrder, reservePriority, startPayment, paymentsEnabled, syncPayment, weekLabel } from '../lib/billing';
+import { dateRu, plural } from '../lib/text';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login/?next=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
@@ -27,15 +27,20 @@ if (paid) {
 
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
-  const shop = shops.find((s) => s.id === Number(f.get('shop')));
   const action = str(f, 'action', 20);
-  if (!sameOrigin(Astro.request) || !shop) msg = ['err', 'Обновите страницу и попробуйте снова.'];
+  const netShops = action === 'network' ? shops.filter((x) => f.getAll('shops').map(Number).includes(x.id)) : [];
+  const shop = action === 'network' ? netShops[0] : shops.find((s) => s.id === Number(f.get('shop')));
+  if (!sameOrigin(Astro.request) || !shop) msg = ['err', action === 'network' ? 'Отметьте филиалы для пакета.' : 'Обновите страницу и попробуйте снова.'];
+  else if (action === 'network' && netShops.length < NETWORK_MIN) msg = ['err', `Пакет для сетей — от ${NETWORK_MIN} филиалов. Для одного барбершопа подключите PRO в его карточке ниже.`];
   else {
     let res: any = null, what = '';
+    const months = Number(f.get('months')) || 1;
     if (action === 'pro') {
-      const months = Number(f.get('months')) || 1;
-      res = { order: await createProOrder(user.id, shop.id, months) };
+      res = { order: await createProOrder(user.id, [shop.id], months) };
       what = `PRO для «${shop.title}» на ${months} мес`;
+    } else if (action === 'network') {
+      res = { order: await createProOrder(user.id, netShops.map((x) => x.id), months) };
+      what = `Пакет PRO для сети: ${netShops.length} ${plural(netShops.length, 'филиал', 'филиала', 'филиалов')} на ${months} мес`;
     } else if (action === 'priority') {
       if (shop.status !== 'published' || !shop.location_id) res = { error: 'Приоритет доступен опубликованным барбершопам с указанным городом.' };
       else { const week = str(f, 'week', 10); res = await reservePriority(user.id, shop.id, shop.location_id, week); what = `Топ города (${shop.city}) для «${shop.title}», неделя ${weekLabel(week)}`; }
@@ -50,12 +55,24 @@ if (Astro.request.method === 'POST') {
   }
 }
 const cal = Object.fromEntries(await Promise.all(shops.filter((s) => s.location_id && s.status === 'published').map(async (s) => [s.id, await priorityCalendar(s.location_id, s.id)])));
-const orders = await sql`select o.id, o.kind, o.months, o.week_start::text week, o.amount, o.status, o.created_at, b.title from orders o join barbershops b on b.id = o.barbershop_id where o.user_id = ${user.id} order by o.created_at desc limit 30`;
+const orders = await sql`select o.id, o.kind, o.months, o.discount, coalesce(array_length(o.shop_ids, 1), 1) n, o.week_start::text week, o.amount, o.status, o.created_at, b.title from orders o join barbershops b on b.id = o.barbershop_id where o.user_id = ${user.id} order by o.created_at desc limit 30`;
 const ST: Record<string, string> = { pending: 'ожидает оплаты', paid: 'оплачен', cancelled: 'отменён' };
 ---
 <AccountLayout title="Тариф и продвижение" active="/billing/">
   {msg && <p class={`msg ${msg[0]}`}>{msg[1]}</p>}
   {shops.length === 0 && <div class="panel" style="max-width:720px"><p>Сначала <a href="/add/">добавьте барбершоп</a> или заявите права на существующий кнопкой «Это мой барбершоп» в его карточке.</p></div>}
+  {shops.length >= NETWORK_MIN && (
+    <form method="post" class="panel net" id="network">
+      <input type="hidden" name="action" value="network" />
+      <div class="bl-h"><div><p class="eyebrow">Пакет для сетей</p><h2>PRO для всех филиалов — {PRICE.proNetwork.toLocaleString('ru-RU')} ₽/мес за филиал</h2><p class="muted">Вместо {PRICE.pro.toLocaleString('ru-RU')} ₽ — при оплате от {NETWORK_MIN} филиалов одним заказом. Скидки за оплату вперёд суммируются.</p></div></div>
+      <div class="net-shops">{shops.map((s) => <label class="check"><input type="checkbox" name="shops" value={s.id} checked /> {s.title}{s.city ? `, ${s.city}` : ''}{isPro(s) && <small class="muted"> · PRO до {dateRu(s.pro_until)}</small>}</label>)}</div>
+      <div class="bl-row" style="margin-top:12px">
+        <select class="field" name="months" aria-label="Срок">{PRO_PERIODS.map((m) => <option value={m} selected={m === 12}>{m} мес.{proQuote(m, 2).disc ? ` (−${proQuote(m, 2).disc}%)` : ''}</option>)}</select>
+        <button class="btn brass">Оплатить пакет</button>
+      </div>
+      <p class="net-sum" data-net-sum></p>
+    </form>
+  )}
   <div class="bl">
     {shops.map((s) => {
       const pro = isPro(s);
@@ -68,10 +85,11 @@ const ST: Record<string, string> = { pending: 'ожидает оплаты', pai
           <div class="bl-grid">
             <form method="post" class="bl-box">
               <h3>Тариф PRO · {PRICE.pro.toLocaleString('ru-RU')} ₽/мес</h3>
+              <p class="alt" style="margin:0 0 8px">Скидка за оплату вперёд: 6 мес — −15%, 12 мес — −25%.</p>
               <ul class="bl-l"><li>Телефон с кнопкой звонка</li><li>Кнопка «Записаться онлайн»</li><li>Ссылки на сайт и соцсети</li></ul>
               <input type="hidden" name="action" value="pro" /><input type="hidden" name="shop" value={s.id} />
               <div class="bl-row">
-                <select class="field" name="months" aria-label="Срок">{PRO_PERIODS.map((m) => <option value={m}>{m} мес. — {(PRICE.pro * m).toLocaleString('ru-RU')} ₽</option>)}</select>
+                <select class="field" name="months" aria-label="Срок">{PRO_PERIODS.map((m) => { const q = proQuote(m, 1); return <option value={m}>{m} мес. — {q.total.toLocaleString('ru-RU')} ₽{q.disc ? ` (−${q.disc}%, ${q.monthly.toLocaleString('ru-RU')} ₽/мес)` : ''}</option>; })}</select>
                 <button class="btn brass">{pro ? 'Продлить' : 'Подключить'}</button>
               </div>
             </form>
@@ -101,12 +119,25 @@ const ST: Record<string, string> = { pending: 'ожидает оплаты', pai
     <section class="panel" style="margin-top:20px">
       <h2 class="h3">Заказы</h2>
       <table class="ord"><thead><tr><th>№</th><th>Услуга</th><th>Сумма</th><th>Статус</th></tr></thead>
-        <tbody>{orders.map((o) => <tr><td>{o.id}</td><td>{o.title}: {o.kind === 'pro' ? `PRO, ${o.months} мес.` : `топ города, ${weekLabel(o.week)}`}<br /><small class="muted">{dateRu(o.created_at)}</small></td><td>{o.amount.toLocaleString('ru-RU')} ₽</td><td>{ST[o.status]}</td></tr>)}</tbody></table>
+        <tbody>{orders.map((o) => <tr><td>{o.id}</td><td>{o.title}: {o.kind === 'pro' ? `PRO, ${o.months} мес.${o.discount ? ` (−${o.discount}%)` : ''}${o.n > 1 ? `, филиалов: ${o.n}` : ''}` : `топ города, ${weekLabel(o.week)}`}<br /><small class="muted">{dateRu(o.created_at)}</small></td><td>{o.amount.toLocaleString('ru-RU')} ₽</td><td>{ST[o.status]}</td></tr>)}</tbody></table>
       <p class="alt">Неоплаченная бронь топа сгорает через 48 часов. Продавец: {SELLER.name}, ИНН {SELLER.inn}. <a href="/oferta/">Оферта</a>.</p>
     </section>
   )}
+  <script is:inline define:vars={{ base: PRICE.pro, net: PRICE.proNetwork, min: NETWORK_MIN }}>
+    var f = document.getElementById('network');
+    if (f) {
+      var out = f.querySelector('[data-net-sum]');
+      var calc = function () {
+        var n = f.querySelectorAll('input[name=shops]:checked').length, m = +f.months.value;
+        var d = m >= 12 ? 25 : m >= 6 ? 15 : 0, per = n >= min ? net : base, total = Math.round(per * m * n * (100 - d) / 100);
+        out.textContent = n < min ? 'Отметьте минимум ' + min + ' филиала.' : n + ' × ' + per.toLocaleString('ru-RU') + ' ₽ × ' + m + ' мес' + (d ? ' − ' + d + '%' : '') + ' = ' + total.toLocaleString('ru-RU') + ' ₽ (экономия ' + (base * m * n - total).toLocaleString('ru-RU') + ' ₽)';
+      };
+      f.addEventListener('change', calc); calc();
+    }
+  </script>
 </AccountLayout>
 <style>
+.net{max-width:1000px;margin-bottom:18px;border:2px solid var(--brass)}.net h2{font-size:22px;margin:2px 0}.net-shops{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px;margin-top:12px}.net-sum{margin:10px 0 0;font-weight:650}
 .bl{display:grid;gap:18px;max-width:1000px}
 .bl-h{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.bl-h h2{margin:0;font-size:22px}.bl-h p{margin:2px 0 0}
 .badge.free{background:var(--line)}

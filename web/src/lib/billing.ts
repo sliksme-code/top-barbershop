@@ -1,6 +1,17 @@
 import { sql } from './db';
 
-export const PRICE = { pro: 1990, priority: 3000 } as const;
+export const PRICE = { pro: 1990, proNetwork: 1190, priority: 3000 } as const;
+/** Скидка за оплату вперёд: от 6 мес — 15%, от 12 мес — 25% */
+export const discountFor = (months: number) => (months >= 12 ? 25 : months >= 6 ? 15 : 0);
+/** Пакет для сетей: от 2 филиалов в одном заказе — 1 190 ₽/мес за филиал */
+export const NETWORK_MIN = 2;
+export function proQuote(months: number, branches = 1) {
+  const per = branches >= NETWORK_MIN ? PRICE.proNetwork : PRICE.pro;
+  const disc = discountFor(months);
+  const full = per * months * branches;
+  const total = Math.round((full * (100 - disc)) / 100);
+  return { per, disc, full, total, monthly: Math.round(total / months / branches) };
+}
 export const PRO_PERIODS = [1, 3, 6, 12] as const;
 export const PRIORITY_SLOTS = 3;
 export const SELLER = {
@@ -37,9 +48,12 @@ export async function priorityCalendar(locationId: number, shopId: number, weeks
   return list.map((w) => ({ week: w, label: weekLabel(w), free: Math.max(0, PRIORITY_SLOTS - (b[w] || 0)), mine: m[w] || null }));
 }
 
-export async function createProOrder(userId: number, shopId: number, months: number) {
+export async function createProOrder(userId: number, shopIds: number[], months: number) {
   const m = (PRO_PERIODS as readonly number[]).includes(months) ? months : 1;
-  const [o] = await sql`insert into orders (user_id, barbershop_id, kind, months, amount) values (${userId}, ${shopId}, 'pro', ${m}, ${PRICE.pro * m}) returning id, amount`;
+  const ids = [...new Set(shopIds)].filter(Boolean);
+  const q = proQuote(m, ids.length);
+  const [o] = await sql`insert into orders (user_id, barbershop_id, shop_ids, kind, months, amount, discount)
+    values (${userId}, ${ids[0]}, ${ids.length > 1 ? ids : null}, 'pro', ${m}, ${q.total}, ${q.disc}) returning id, amount`;
   return o;
 }
 
