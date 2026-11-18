@@ -1,0 +1,46 @@
+name: directus-admin
+# Создаёт (или обновляет пароль) администратора Directus. Пароль — из секрета ADMIN_NAME, в логи не выводится.
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: e-mail администратора
+        required: true
+jobs:
+  admin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check secret
+        env:
+          PW: ${{ secrets.ADMIN_NAME }}
+        run: |
+          [ -n "$PW" ] || { echo "Секрет ADMIN_NAME пуст или не найден"; exit 1; }
+          echo "пароль: ${#PW} символов"
+      - uses: appleboy/ssh-action@v1.2.0
+        env:
+          ADMIN_PW: ${{ secrets.ADMIN_NAME }}
+          ADMIN_EMAIL: ${{ inputs.email }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: ADMIN_PW,ADMIN_EMAIL
+          script: |
+            set -e
+            cd /opt/top-barbershop
+            set -a; . ./.env; set +a
+            Q="docker compose exec -T postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -Atc"
+            ROLE=$($Q "select r.id from directus_roles r join directus_access a on a.role = r.id join directus_policies p on p.id = a.policy where p.admin_access limit 1")
+            [ -n "$ROLE" ] || ROLE=$($Q "select id from directus_roles where name ilike 'admin%' limit 1")
+            echo "роль администратора: $ROLE"
+            EXISTS=$($Q "select count(*) from directus_users where lower(email) = lower('$ADMIN_EMAIL')")
+            if [ "$EXISTS" = "0" ]; then
+              docker compose exec -T -e PW="$ADMIN_PW" -e EM="$ADMIN_EMAIL" -e RL="$ROLE" directus sh -c 'npx directus users create --email "$EM" --password "$PW" --role "$RL"' 2>&1 | grep -v -i password || true
+            else
+              docker compose exec -T -e PW="$ADMIN_PW" -e EM="$ADMIN_EMAIL" directus sh -c 'npx directus users passwd --email "$EM" --password "$PW"' 2>&1 | grep -v -i password || true
+              $Q "update directus_users set role = '$ROLE', status = 'active' where lower(email) = lower('$ADMIN_EMAIL')"
+            fi
+            $Q "select u.email, u.status, r.name from directus_users u left join directus_roles r on r.id = u.role where lower(u.email) = lower('$ADMIN_EMAIL')"
+            # проверка входа
+            CODE=$(docker compose exec -T -e PW="$ADMIN_PW" -e EM="$ADMIN_EMAIL" directus sh -c 'wget -qO- --header="Content-Type: application/json" --post-data="{\"email\":\"$EM\",\"password\":\"$PW\"}" http://localhost:8055/auth/login >/dev/null 2>&1 && echo OK || echo FAIL')
+            echo "вход в Directus: $CODE"
