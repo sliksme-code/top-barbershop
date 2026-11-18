@@ -80,26 +80,74 @@ const SHOP = process.env.YOOKASSA_SHOP_ID, SECRET = process.env.YOOKASSA_SECRET;
 export const paymentsEnabled = Boolean(SHOP && SECRET);
 const auth = () => 'Basic ' + Buffer.from(`${SHOP}:${SECRET}`).toString('base64');
 
-export async function startPayment(order: { id: number; amount: number }, description: string, email: string) {
-  if (!paymentsEnabled) return null;
+const receipt = (email: string, description: string, amount: number) =>
+  process.env.YOOKASSA_RECEIPT !== '0'
+    ? { receipt: { customer: { email }, tax_system_code: Number(process.env.YOOKASSA_TAX_SYSTEM || 6), items: [{ description: description.slice(0, 128), quantity: '1.00', amount: { value: amount.toFixed(2), currency: 'RUB' }, vat_code: 1, payment_mode: 'full_payment', payment_subject: 'service' }] } }
+    : {};
+export const SITE = 'https://top-barbershop.com';
+export const payUrl = (orderId: number) => `${SITE}/billing/pay/?order=${orderId}`;
+const returnUrl = (orderId: number) => `${SITE}/billing/?paid=${orderId}`;
+
+async function ykCreate(order: { id: number; amount: number }, description: string, email: string, type: 'embedded' | 'redirect') {
   const r = await fetch('https://api.yookassa.ru/v3/payments', {
     method: 'POST',
-    headers: { Authorization: auth(), 'Idempotence-Key': `order-${order.id}-${Date.now()}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: auth(), 'Idempotence-Key': `order-${order.id}-${type}-${Date.now()}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       amount: { value: order.amount.toFixed(2), currency: 'RUB' },
       capture: true,
-      confirmation: { type: 'redirect', return_url: `https://top-barbershop.com/billing/?paid=${order.id}` },
+      confirmation: type === 'embedded' ? { type: 'embedded' } : { type: 'redirect', return_url: returnUrl(order.id) },
       description: description.slice(0, 128),
       metadata: { order_id: String(order.id) },
-      ...(process.env.YOOKASSA_RECEIPT !== '0' ? { receipt: { customer: { email }, tax_system_code: Number(process.env.YOOKASSA_TAX_SYSTEM || 6), items: [{ description: description.slice(0, 128), quantity: '1.00', amount: { value: order.amount.toFixed(2), currency: 'RUB' }, vat_code: 1, payment_mode: 'full_payment', payment_subject: 'service' }] } } : {}),
+      ...receipt(email, description, order.amount),
     }),
     signal: AbortSignal.timeout(15000),
   });
   const j: any = await r.json();
-  if (!r.ok) { console.error('yookassa', j); return null; }
+  if (!r.ok) { console.error('yookassa', type, j?.code, j?.description); return null; }
   await sql`update orders set payment_id = ${j.id} where id = ${order.id}`;
-  return j.confirmation?.confirmation_url as string;
+  return j;
 }
+
+/** Ссылка на страницу оплаты ЮKassa (запасной вариант, если виджет не загрузился). */
+export async function startPayment(order: { id: number; amount: number }, description: string, email: string) {
+  if (!paymentsEnabled) return null;
+  const j = await ykCreate(order, description, email, 'redirect');
+  return (j?.confirmation?.confirmation_url as string) || null;
+}
+
+/**
+ * Платёж для виджета в кабинете. Если у заказа уже есть живой встроенный платёж — переиспользуем его токен,
+ * иначе создаём новый. Возвращает { token } или { paid: true } или null.
+ */
+export async function embeddedPayment(order: { id: number; amount: number; payment_id?: string | null }, description: string, email: string) {
+  if (!paymentsEnabled) return null;
+  if (order.payment_id) {
+    const r = await fetch(`https://api.yookassa.ru/v3/payments/${encodeURIComponent(order.payment_id)}`, { headers: { Authorization: auth() }, signal: AbortSignal.timeout(15000) }).catch(() => null);
+    const p: any = r?.ok ? await r.json() : null;
+    if (p?.status === 'succeeded' || p?.status === 'waiting_for_capture') { await syncPayment(p.id); return { paid: true }; }
+    if (p?.status === 'pending' && p.confirmation?.type === 'embedded' && p.confirmation.confirmation_token) return { token: p.confirmation.confirmation_token as string };
+  }
+  const j = await ykCreate(order, description, email, 'embedded');
+  return j?.confirmation?.confirmation_token ? { token: j.confirmation.confirmation_token as string } : null;
+}
+
+/** Человекочитаемое название заказа — для чека, страницы оплаты и писем. */
+export function orderTitle(o: { kind: string; months?: number | null; n?: number | null; week?: string | null; title: string; city?: string | null }) {
+  if (o.kind === 'pro') return (o.n || 1) > 1 ? `Пакет PRO для сети: ${o.n} филиалов на ${o.months} мес` : `PRO для «${o.title}» на ${o.months} мес`;
+  return `Топ города${o.city ? ` (${o.city})` : ''} для «${o.title}», неделя ${weekLabel(o.week || '')}`;
+}
+
+/** Заказ пользователя со всем нужным для оплаты. */
+export async function loadOrder(id: number) {
+  const [o] = await sql`select o.id, o.user_id, o.kind, o.months, o.amount, o.discount, o.status, o.payment_id, o.created_at, o.week_start::text week,
+      coalesce(array_length(o.shop_ids, 1), 1) n, b.title, l.name city, ps.status slot_status, ps.created_at slot_at
+    from orders o join barbershops b on b.id = o.barbershop_id left join locations l on l.id = b.location_id
+    left join priority_slots ps on ps.order_id = o.id where o.id = ${id}`;
+  return o || null;
+}
+
+/** Бронь топа ещё действует? (неоплаченная сгорает через 48 часов) */
+export const priorityAlive = (o: any) => o.kind !== 'priority' || (o.slot_status === 'reserved' && Date.now() - new Date(o.slot_at).getTime() < 48 * 3600e3);
 
 /** Проверяем платёж запросом в ЮKassa (вебхуку на слово не верим) и отмечаем заказ оплаченным. */
 export async function syncPayment(paymentId: string) {
@@ -110,6 +158,44 @@ export async function syncPayment(paymentId: string) {
   const id = Number(p.metadata?.order_id);
   if (!id) return false;
   if (p.status === 'succeeded') await sql`update orders set status = 'paid', payment_id = ${p.id} where id = ${id} and status = 'pending'`;
-  if (p.status === 'canceled') await sql`update orders set status = 'cancelled' where id = ${id} and status = 'pending'`;
+  // отменённый платёж (отказ банка, закрыли форму) заказ не отменяет — можно оплатить снова
   return true;
+}
+
+// ---- Напоминание об оплате: через час после неоплаченного заказа, одно письмо ----
+export function startPaymentReminders() {
+  const g = globalThis as any;
+  if (g.__tbReminders || process.env.SITE_ENV !== 'production') return;
+  g.__tbReminders = true;
+  const tick = async () => {
+    const { sendMail, mailEnabled } = await import('./mail');
+    if (!mailEnabled) return;
+    const rows = await sql`select o.id, u.email from orders o join site_users u on u.id = o.user_id
+      where o.status = 'pending' and o.reminded_at is null and u.email is not null
+        and o.created_at < now() - interval '1 hour' and o.created_at > now() - interval '3 days' order by o.id limit 20`;
+    for (const r of rows) {
+      const [claim] = await sql`update orders set reminded_at = now() where id = ${r.id} and reminded_at is null returning id`;
+      if (!claim) continue;
+      let o = await loadOrder(r.id);
+      if (o?.payment_id) { await syncPayment(o.payment_id).catch(() => false); o = await loadOrder(r.id); }
+      if (!o || o.status !== 'pending' || !priorityAlive(o)) continue;
+      const what = orderTitle(o);
+      const left = o.kind === 'priority' ? Math.max(1, Math.round((48 * 3600e3 - (Date.now() - new Date(o.slot_at).getTime())) / 3600e3)) : 0;
+      const text = [
+        'Здравствуйте!', '',
+        `Вы оформили заказ №${o.id} на TOP BARBERSHOP: ${what}.`,
+        `Сумма: ${o.amount.toLocaleString('ru-RU')} ₽. Оплата пока не поступила.`, '',
+        'Оплатить можно в личном кабинете по ссылке:',
+        payUrl(o.id), '',
+        ...(o.kind === 'priority' ? [`Место в топе города держится за вами ещё около ${left} ч, потом бронь снимается и место может занять другой барбершоп.`, ''] : []),
+        'Если вы уже оплатили или передумали — просто не обращайте внимания на это письмо.', '',
+        `TOP BARBERSHOP · ${SELLER.name}, ИНН ${SELLER.inn}`, SITE + '/',
+      ].join('\n');
+      const ok = await sendMail(r.email, `Заказ №${o.id} ждёт оплаты — TOP BARBERSHOP`, text);
+      if (!ok) await sql`update orders set reminded_at = null where id = ${o.id}`;
+    }
+  };
+  const run = () => tick().catch((e) => console.error('reminders', e?.message));
+  setTimeout(run, 60_000);
+  setInterval(run, 10 * 60_000);
 }

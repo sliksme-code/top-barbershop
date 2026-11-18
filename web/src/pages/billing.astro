@@ -4,7 +4,7 @@ import '../styles/forms.css';
 import { sql } from '../lib/db';
 import { sameOrigin, str } from '../lib/forms';
 import { sendMail, ADMIN_EMAIL } from '../lib/mail';
-import { PRICE, PRO_PERIODS, SELLER, NETWORK_MIN, proQuote, isPro, priorityCalendar, createProOrder, reservePriority, startPayment, paymentsEnabled, syncPayment, weekLabel } from '../lib/billing';
+import { PRICE, PRO_PERIODS, SELLER, NETWORK_MIN, proQuote, isPro, priorityCalendar, createProOrder, reservePriority, paymentsEnabled, syncPayment, weekLabel } from '../lib/billing';
 import { dateRu, plural } from '../lib/text';
 import PriceGrid from '../components/PriceGrid.astro';
 
@@ -48,8 +48,7 @@ if (Astro.request.method === 'POST') {
     }
     if (res?.error) msg = ['err', res.error];
     else if (res?.order) {
-      const url = await startPayment(res.order, `TOP BARBERSHOP: ${what}`, user.email).catch(() => null);
-      if (url) return Astro.redirect(url);
+      if (paymentsEnabled) return Astro.redirect(`/billing/pay/?order=${res.order.id}`);
       if (ADMIN_EMAIL) sendMail(ADMIN_EMAIL, `Новый заказ №${res.order.id}: ${res.order.amount} ₽`, `${user.email}\n${what}\nСумма: ${res.order.amount} ₽\nОтметить оплату: https://cms.new.top-barbershop.com/admin/content/orders/${res.order.id}`);
       msg = ['ok', `Заказ №${res.order.id} на ${res.order.amount.toLocaleString('ru-RU')} ₽ создан: ${what}. ${paymentsEnabled ? '' : 'Мы пришлём счёт на ' + user.email + ' в течение рабочего дня; услуга включится сразу после оплаты.'}`];
     }
@@ -121,7 +120,7 @@ const ST: Record<string, string> = { pending: 'ожидает оплаты', pai
     <section class="panel" style="margin-top:20px">
       <h2 class="h3">Заказы</h2>
       <table class="ord"><thead><tr><th>№</th><th>Услуга</th><th>Сумма</th><th>Статус</th></tr></thead>
-        <tbody>{orders.map((o) => <tr><td>{o.id}</td><td>{o.title}: {o.kind === 'pro' ? `PRO, ${o.months} мес.${o.discount ? ` (−${o.discount}%)` : ''}${o.n > 1 ? `, филиалов: ${o.n}` : ''}` : `топ города, ${weekLabel(o.week)}`}<br /><small class="muted">{dateRu(o.created_at)}</small></td><td>{o.amount.toLocaleString('ru-RU')} ₽</td><td>{ST[o.status]}</td></tr>)}</tbody></table>
+        <tbody>{orders.map((o) => <tr><td>{o.id}</td><td>{o.title}: {o.kind === 'pro' ? `PRO, ${o.months} мес.${o.discount ? ` (−${o.discount}%)` : ''}${o.n > 1 ? `, филиалов: ${o.n}` : ''}` : `топ города, ${weekLabel(o.week)}`}<br /><small class="muted">{dateRu(o.created_at)}</small></td><td>{o.amount.toLocaleString('ru-RU')} ₽</td><td>{o.status === 'pending' && paymentsEnabled && (o.kind === 'pro' || Date.now() - new Date(o.created_at).getTime() < 48 * 3600e3) ? <a class="btn sm brass" href={`/billing/pay/?order=${o.id}`}>Оплатить</a> : ST[o.status]}</td></tr>)}</tbody></table>
       <p class="alt">Неоплаченная бронь топа сгорает через 48 часов. Продавец: {SELLER.name}, ИНН {SELLER.inn}. <a href="/oferta/">Оферта</a>.</p>
     </section>
   )}

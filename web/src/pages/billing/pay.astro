@@ -1,0 +1,85 @@
+---
+import AccountLayout from '../../components/AccountLayout.astro';
+import { sql } from '../../lib/db';
+import { SELLER, embeddedPayment, loadOrder, orderTitle, paymentsEnabled, priorityAlive, startPayment } from '../../lib/billing';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login/?next=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
+const isAdmin = ['administrator', 'editor'].includes(user.role || '');
+const id = Number(Astro.url.searchParams.get('order')) || 0;
+const o = id ? await loadOrder(id) : null;
+const mine = o && (o.user_id === user.id || isAdmin);
+
+let state: 'pay' | 'none' | 'cancelled' | 'expired' | 'off' | 'error' = 'none';
+let token = '', fallback = '';
+const what = mine ? orderTitle(o) : '';
+if (mine) {
+  if (o.status === 'paid') return Astro.redirect(`/billing/?paid=${o.id}`);
+  if (o.status === 'cancelled') state = 'cancelled';
+  else if (!priorityAlive(o)) {
+    state = 'expired';
+    await sql`update orders set status = 'cancelled' where id = ${o.id} and status = 'pending'`;
+  } else if (!paymentsEnabled) state = 'off';
+  else {
+    const p = await embeddedPayment(o, `TOP BARBERSHOP: ${what}`, user.email).catch(() => null);
+    if (p && 'paid' in p) return Astro.redirect(`/billing/?paid=${o.id}`);
+    if (p?.token) { token = p.token; state = 'pay'; }
+    else {
+      fallback = (await startPayment(o, `TOP BARBERSHOP: ${what}`, user.email).catch(() => null)) || '';
+      state = fallback ? 'pay' : 'error';
+    }
+  }
+}
+const back = `https://top-barbershop.com/billing/?paid=${id}`;
+---
+<AccountLayout title="Оплата заказа" active="/billing/">
+  {!mine && <div class="panel pay"><p>Заказ не найден. Все ваши заказы — в разделе <a href="/billing/">«Тариф и продвижение»</a>.</p></div>}
+  {mine && (
+    <div class="panel pay">
+      <p class="eyebrow">Заказ №{o.id}</p>
+      <h2>{what}</h2>
+      <p class="sum">{o.amount.toLocaleString('ru-RU')} ₽{o.discount ? <small class="muted"> · скидка {o.discount}%</small> : null}</p>
+      {state === 'pay' && Astro.url.searchParams.has('retry') && <p class="msg err">Оплата не прошла. Попробуйте ещё раз или выберите другой способ.</p>}
+      {state === 'pay' && token && (
+        <>
+          <div id="yk-widget" class="yk"><p class="muted">Загружаем форму оплаты…</p></div>
+          <p class="alt">Платёж принимает ЮKassa, данные карты на наш сайт не попадают. Услуга включится сразу после оплаты.</p>
+        </>
+      )}
+      {state === 'pay' && !token && fallback && (
+        <p><a class="btn brass" href={fallback}>Перейти к оплате</a></p>
+      )}
+      {state === 'cancelled' && <p class="msg err">Заказ отменён. Оформите новый в разделе <a href="/billing/">«Тариф и продвижение»</a>.</p>}
+      {state === 'expired' && <p class="msg err">Бронь недели в топе города истекла: неоплаченное место держится 48 часов. Выберите неделю заново в разделе <a href="/billing/">«Тариф и продвижение»</a>.</p>}
+      {state === 'off' && <p class="msg ok">Онлайн-оплата временно недоступна. Мы пришлём счёт на {user.email} в течение рабочего дня.</p>}
+      {state === 'error' && <p class="msg err">Не удалось открыть оплату. Обновите страницу через минуту или напишите нам: <a href={`mailto:${SELLER.email}`}>{SELLER.email}</a>.</p>}
+      <p class="alt" style="margin-top:16px"><a href="/billing/">← Вернуться к тарифам</a> · Продавец: {SELLER.name}, ИНН {SELLER.inn}. <a href="/oferta/">Оферта</a>.</p>
+    </div>
+  )}
+  {token && (
+    <>
+      <script is:inline src="https://yookassa.ru/checkout-widget/v1/checkout-widget.js"></script>
+      <script is:inline define:vars={{ token, back, fallbackId: id }}>
+        (function () {
+          var box = document.getElementById('yk-widget');
+          function fail() { box.innerHTML = '<p class="msg err">Форма оплаты не загрузилась. <a href="/billing/pay/?order=' + fallbackId + '">Обновите страницу</a>.</p>'; }
+          if (!window.YooMoneyCheckoutWidget) return fail();
+          box.innerHTML = '';
+          var w = new window.YooMoneyCheckoutWidget({
+            confirmation_token: token,
+            return_url: back,
+            customization: { colors: { control_primary: '#b8893d', control_primary_content: '#ffffff' } },
+            error_callback: function (e) { console.error('yookassa widget', e); fail(); }
+          });
+          w.on('success', function () { w.destroy(); location.href = back; });
+          w.on('fail', function () { w.destroy(); location.href = '/billing/pay/?order=' + fallbackId + '&retry=1'; });
+          w.render('yk-widget');
+        })();
+      </script>
+    </>
+  )}
+</AccountLayout>
+<style>
+.pay{max-width:720px}.pay h2{margin:2px 0 6px;font-size:22px}.sum{font-size:28px;font-weight:700;margin:0 0 16px}
+.yk{min-height:320px}
+</style>
