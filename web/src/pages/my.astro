@@ -32,7 +32,7 @@ const saved = Astro.url.searchParams.get('saved');
             <span class="muted">{[s.city, s.address].filter(Boolean).join(', ')}</span>
             <span><span class={`badge ${s.status === 'published' ? 'top' : ''}`}>{st[s.status] || s.status}</span> {s.rating ? `★ ${s.rating.toFixed(1)} · отзывов: ${s.reviews_count}` : ''}</span>
           </div>
-          <div class="my-a"><a class="btn sm" href={`/edit/?id=${s.id}`}>Редактировать</a><a class="btn ghost sm" href={`/billing/?id=${s.id}`}>{s.pro ? 'PRO ✓' : 'Подключить PRO'}</a></div>
+          <div class="my-a"><a class="btn sm" href={`/edit/?id=${s.id}`}>Редактировать</a>{s.status === 'published' && <a class="btn ghost sm" href={`/stats/?id=${s.id}`}>Статистика</a>}<a class="btn ghost sm" href={`/billing/?id=${s.id}`}>{s.pro ? 'PRO ✓' : 'Подключить PRO'}</a></div>
         </div>
       ))}
     </div>

@@ -1,0 +1,127 @@
+---
+import AccountLayout from '../components/AccountLayout.astro';
+import '../styles/forms.css';
+import { sql } from '../lib/db';
+import { isPro } from '../lib/billing';
+import { shopStats, STATS_SINCE } from '../lib/stats';
+import { dateRu } from '../lib/text';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/login/?next=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
+const isAdmin = ['administrator', 'editor'].includes(user.role || '');
+const focus = Number(Astro.url.searchParams.get('id')) || 0;
+const days = [7, 30, 90].includes(Number(Astro.url.searchParams.get('d'))) ? Number(Astro.url.searchParams.get('d')) : 30;
+const shops = await sql`select b.id, b.slug, b.title, b.status, b.pro_until, l.name city from barbershops b left join locations l on l.id = b.location_id
+  where ${isAdmin && focus ? sql`b.id = ${focus}` : sql`(b.owner_id = ${user.id} or b.submitted_by = ${user.id}) and (${focus} = 0 or b.id = ${focus})`} and b.status <> 'trash'
+  order by (b.id = ${focus}) desc, b.title`;
+const data = await Promise.all(shops.map(async (s) => ({ s, st: s.status === 'published' ? await shopStats(s.id, days) : null })));
+
+const fmt = (n: number) => n.toLocaleString('ru-RU');
+const pct = (a: number, b: number) => (b ? (Math.round((a / b) * 1000) / 10).toLocaleString('ru-RU') + '%' : '—');
+const delta = (cur: number, prev: number) => {
+  if (!prev) return null;
+  const d = Math.round(((cur - prev) / prev) * 100);
+  return { d, cls: d > 0 ? 'up' : d < 0 ? 'down' : '', txt: (d > 0 ? '+' : '') + d + '%' };
+};
+const W = 640, H = 120;
+function bars(rows: any[], key: string) {
+  const max = Math.max(1, ...rows.map((r) => Number(r[key])));
+  const bw = W / rows.length;
+  return rows.map((r, i) => {
+    const h = Math.round((Number(r[key]) / max) * (H - 4));
+    return { x: i * bw + 1, w: Math.max(1, bw - 2), y: H - h, h, title: `${dateRu(r.day)}: ${r[key]}` };
+  });
+}
+const periodLabel = { 7: '7 дней', 30: '30 дней', 90: '90 дней' } as Record<number, string>;
+---
+<AccountLayout title="Статистика" active="/stats/">
+  <div class="st-top">
+    <p class="alt">Сколько раз ваш барбершоп показали в каталоге, сколько человек открыли карточку и сколько нажали на запись, телефон, сайт и соцсети.</p>
+    <nav class="st-per" aria-label="Период">
+      {[7, 30, 90].map((d) => <a href={`?d=${d}${focus ? `&id=${focus}` : ''}`} class={d === days ? 'on' : ''}>{periodLabel[d]}</a>)}
+    </nav>
+  </div>
+  {shops.length === 0 && <div class="panel" style="max-width:720px"><p>Сначала <a href="/add/">добавьте барбершоп</a> или заявите права на существующий кнопкой «Это мой барбершоп» в его карточке.</p></div>}
+  <div class="st-list">
+    {data.map(({ s, st }) => {
+      const pro = isPro(s);
+      return (
+        <section class="panel st">
+          <header class="st-h">
+            <div><h2><a href={`/place/${s.slug}/`}>{s.title}</a></h2><p class="muted">{s.city}{pro ? ' · PRO' : ' · бесплатный тариф'}</p></div>
+          </header>
+          {!st ? <p class="alt">Статистика появится после публикации барбершопа.</p> : (
+            <>
+              <div class="kpi">
+                {[
+                  ['Показы в каталоге', st.tot.impressions, delta(st.tot.impressions, st.prev.impressions), 'карточка появилась в списке города, метро, сети или в блоке «рядом»'],
+                  ['Просмотры карточки', st.tot.views, delta(st.tot.views, st.prev.views), `открыли страницу барбершопа · CTR ${pct(st.tot.views, st.tot.impressions)}`],
+                  ['Клики по контактам', st.contacts, delta(st.contacts, st.prev.contacts), `запись, телефон, сайт, соцсети · ${pct(st.contacts, st.tot.views)} от просмотров`],
+                  ['Записаться онлайн', st.tot.booking, null, pro ? 'нажали кнопку записи' : 'кнопка скрыта на бесплатном тарифе'],
+                ].map(([l, v, dl, hint]: any) => (
+                  <div class="kpi-i">
+                    <span class="kpi-l">{l}</span>
+                    <b class="kpi-v">{fmt(v)}{dl && <small class={`dl ${dl.cls}`}>{dl.txt}</small>}</b>
+                    <span class="kpi-h">{hint}</span>
+                  </div>
+                ))}
+              </div>
+              <div class="charts">
+                <figure>
+                  <figcaption>Показы по дням</figcaption>
+                  <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Показы по дням">{bars(st.rows, 'impressions').map((b) => <rect x={b.x} y={b.y} width={b.w} height={b.h} class="b-imp"><title>{b.title}</title></rect>)}</svg>
+                </figure>
+                <figure>
+                  <figcaption>Просмотры карточки по дням</figcaption>
+                  <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Просмотры по дням">{bars(st.rows, 'views').map((b) => <rect x={b.x} y={b.y} width={b.w} height={b.h} class="b-view"><title>{b.title}</title></rect>)}</svg>
+                </figure>
+              </div>
+              <table class="st-t">
+                <thead><tr><th>Контакт</th><th>Нажатий</th></tr></thead>
+                <tbody>
+                  <tr><td>Записаться онлайн</td><td>{fmt(st.tot.booking)}</td></tr>
+                  <tr><td>Телефон</td><td>{fmt(st.tot.phone)}</td></tr>
+                  <tr><td>Сайт</td><td>{fmt(st.tot.site)}</td></tr>
+                  <tr><td>Соцсети</td><td>{fmt(st.tot.social)}</td></tr>
+                </tbody>
+              </table>
+              {!pro && (
+                <div class="upsell">
+                  <p><b>На бесплатном тарифе телефон, сайт и кнопка записи скрыты</b>{st.tot.views ? ` — ${fmt(st.tot.views)} ${st.tot.views === 1 ? 'человек открыл' : 'человек открыли'} карточку, но не смогли с вами связаться.` : '.'}</p>
+                  <a class="btn brass sm" href={`/billing/?id=${s.id}`}>Подключить PRO — 990 ₽/мес</a>
+                </div>
+              )}
+              <details class="st-days">
+                <summary>По дням</summary>
+                <table class="st-t">
+                  <thead><tr><th>Дата</th><th>Показы</th><th>Просмотры</th><th>Запись</th><th>Телефон</th><th>Сайт</th><th>Соцсети</th></tr></thead>
+                  <tbody>{[...st.rows].reverse().map((r: any) => <tr><td>{dateRu(r.day)}</td><td>{r.impressions}</td><td>{r.views}</td><td>{r.booking}</td><td>{r.phone}</td><td>{r.site}</td><td>{r.social}</td></tr>)}</tbody>
+                </table>
+              </details>
+            </>
+          )}
+        </section>
+      );
+    })}
+  </div>
+  <p class="alt st-note">Статистика собирается с {dateRu(STATS_SINCE)} Каждого посетителя считаем один раз в сутки по каждому действию; поисковые роботы и ваши собственные визиты в карточку не учитываются. Сравнение — с предыдущим периодом такой же длины.</p>
+</AccountLayout>
+<style>
+.st-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;max-width:1000px}.st-top .alt{margin:0;max-width:620px}
+.st-per{display:flex;gap:6px}.st-per a{padding:7px 12px;border:1px solid var(--line);border-radius:999px;text-decoration:none;font-size:14px;font-weight:600;background:#fff;color:var(--ink)}.st-per a.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.st-list{display:grid;gap:18px;max-width:1000px;margin-top:18px}
+.st-h h2{margin:0;font-size:22px}.st-h h2 a{text-decoration:none;color:inherit}.st-h p{margin:2px 0 0}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:10px;margin:14px 0}
+.kpi-i{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:4px;min-width:0}
+.kpi-l{font-size:14px;color:var(--muted)}.kpi-v{font-size:28px;line-height:1.1}.kpi-h{font-size:13px;color:var(--muted)}
+.dl{font-size:14px;margin-left:8px;font-weight:650}.dl.up{color:var(--ok)}.dl.down{color:var(--red)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:16px}
+.charts figure{margin:0}.charts figcaption{font-size:14px;color:var(--muted);margin-bottom:6px}
+.charts svg{width:100%;height:120px;background:var(--paper);border-radius:8px;display:block}
+.b-imp{fill:#d9c4a0}.b-view{fill:var(--brass)}
+.st-t{width:100%;border-collapse:collapse;font-size:15px;margin-top:14px}.st-t td,.st-t th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}.st-t td+td,.st-t th+th{text-align:right}
+.upsell{margin-top:14px;padding:12px 14px;border-radius:10px;background:#fffaf0;border:1px solid var(--line)}.upsell p{margin:0 0 8px}
+.st-days{margin-top:12px}.st-days summary{cursor:pointer;font-weight:600}
+.st-note{max-width:1000px;margin-top:18px}
+@media (max-width:560px){.st-days .st-t{display:block;overflow-x:auto}}
+</style>

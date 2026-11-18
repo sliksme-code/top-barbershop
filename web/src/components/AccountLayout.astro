@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 const { title, active } = Astro.props as { title: string; active?: string };
 const user = Astro.locals.user;
-const tabs = [['/my/', 'Мои барбершопы'], ['/my-favorites/', 'Избранное'], ['/billing/', 'Тариф и продвижение'], ['/add/', 'Добавить барбершоп'], ['/change-password/', 'Пароль']];
+const tabs = [['/my/', 'Мои барбершопы'], ['/stats/', 'Статистика'], ['/my-favorites/', 'Избранное'], ['/billing/', 'Тариф и продвижение'], ['/add/', 'Добавить барбершоп'], ['/change-password/', 'Пароль']];
 ---
 <Base title={`${title} — TOP BARBERSHOP`} description="Личный кабинет TOP BARBERSHOP" noindex>
   <div class="wrap acc">

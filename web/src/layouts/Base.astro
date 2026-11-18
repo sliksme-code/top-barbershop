@@ -74,6 +74,22 @@ const metrikaId = site.metrikaId;
         var el = e.target.closest && e.target.closest('[data-goal]');
         if (el && window.ym) window.ym(${metrikaId}, 'reachGoal', el.getAttribute('data-goal'));
       });
+      // Статистика карточек для владельцев: показы в списках, просмотры, клики по контактам
+      (function () {
+        if (!navigator.sendBeacon) return;
+        var skip = !!document.querySelector('[data-mine]');
+        function send(e, ids) { if (skip || !ids.length) return; try { navigator.sendBeacon('/api/stat/', new Blob([JSON.stringify({ e: e, ids: ids })], { type: 'text/plain' })); } catch (_) {} }
+        var v = document.querySelector('[data-view]');
+        if (v) send('view', [+v.getAttribute('data-view')]);
+        var q = [], t = null, seen = {};
+        function push(id) { if (seen[id]) return; seen[id] = 1; q.push(id); clearTimeout(t); t = setTimeout(function () { send('imp', q.splice(0)); }, 1500); }
+        if ('IntersectionObserver' in window) {
+          var io = new IntersectionObserver(function (es) { es.forEach(function (x) { if (x.isIntersecting) { push(+x.target.getAttribute('data-shop')); io.unobserve(x.target); } }); }, { threshold: 0.5 });
+          document.querySelectorAll('[data-shop]').forEach(function (el) { io.observe(el); });
+        }
+        addEventListener('pagehide', function () { if (q.length) send('imp', q.splice(0)); });
+        document.addEventListener('click', function (e) { var a = e.target.closest && e.target.closest('[data-stat]'); if (a) send(a.getAttribute('data-stat'), [+a.getAttribute('data-sid')]); });
+      })();
     </script>`} />
   </body>
 </html>

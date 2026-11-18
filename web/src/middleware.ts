@@ -1,7 +1,9 @@
 import { defineMiddleware } from 'astro:middleware';
 import { getSessionUser } from './lib/auth';
 import { startPaymentReminders } from './lib/billing';
+import { startStatsFlusher } from './lib/stats';
 startPaymentReminders();
+startStatsFlusher();
 export const onRequest = defineMiddleware(async (ctx, next) => {
   (ctx.locals as any).user = ctx.cookies.has('tb_s') ? await getSessionUser(ctx.cookies).catch(() => null) : null;
   const res = await next();

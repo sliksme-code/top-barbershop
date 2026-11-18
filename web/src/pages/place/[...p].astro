@@ -97,7 +97,7 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
 <Base {title} {description} ogImage={og} jsonLd={[ld, breadcrumbLd(crumbs)]}>
   <div class="wrap">
     <Crumbs items={crumbs} />
-    <header class="pl-head">
+    <header class="pl-head" data-view={mine ? undefined : s.id} data-mine={mine ? '1' : undefined}>
       <div class="pl-title">
         {s.closed && <span class="badge closed">Закрыт</span>}
         <h1>{s.title}</h1>
@@ -114,8 +114,8 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
       </div>
       {!s.closed && (
         <div class="pl-actions">
-          {booking && <a class="btn brass" href={booking} target="_blank" rel="nofollow noopener" data-goal={site.goals.booking}>Записаться онлайн</a>}
-          {phone && <a class="btn" href={phone} data-goal={site.goals.callShop}>{s.phone}</a>}
+          {booking && <a class="btn brass" href={booking} target="_blank" rel="nofollow noopener" data-goal={site.goals.booking} data-stat="booking" data-sid={s.id}>Записаться онлайн</a>}
+          {phone && <a class="btn" href={phone} data-goal={site.goals.callShop} data-stat="phone" data-sid={s.id}>{s.phone}</a>}
         </div>
       )}
     </header>
@@ -191,13 +191,13 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
           <dl class="pl-dl">
             {s.address && <><dt>Адрес</dt><dd>{s.address}{s.city ? `, ${s.city}` : ''}</dd></>}
             {metroNames.length > 0 && <><dt>Метро</dt><dd>{metroNames.join(', ')}</dd></>}
-            {phone && !s.closed && <><dt>Телефон</dt><dd><a href={phone} data-goal={site.goals.callShop}>{s.phone}</a></dd></>}
-            {website && <><dt>Сайт</dt><dd><a href={website} target="_blank" rel="nofollow noopener" data-goal={site.goals.siteClick}>{website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></dd></>}
+            {phone && !s.closed && <><dt>Телефон</dt><dd><a href={phone} data-goal={site.goals.callShop} data-stat="phone" data-sid={s.id}>{s.phone}</a></dd></>}
+            {website && <><dt>Сайт</dt><dd><a href={website} target="_blank" rel="nofollow noopener" data-goal={site.goals.siteClick} data-stat="site" data-sid={s.id}>{website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></dd></>}
             {hours.length > 0 && <><dt>Часы работы</dt><dd>{sameHours ? <>Ежедневно {hours[0].from}–{hours[0].to}</> : <ul class="pl-hours">{hours.map((h) => <li><span>{DAYS[h.day - 1]}</span> {h.from && h.to ? `${h.from}–${h.to}` : 'выходной'}</li>)}</ul>}</dd></>}
           </dl>
-          {socials.length > 0 && <div class="chips">{socials.map(([n, u]) => <a class="chip" href={u} target="_blank" rel="nofollow noopener">{n}</a>)}</div>}
+          {socials.length > 0 && <div class="chips">{socials.map(([n, u]) => <a class="chip" href={u} target="_blank" rel="nofollow noopener" data-stat="social" data-sid={s.id}>{n}</a>)}</div>}
           {socials.some(([n]) => n.startsWith('Instagram')) && <p class="muted pl-note">* Instagram принадлежит компании Meta, деятельность которой запрещена в России.</p>}
-          {!s.closed && booking && <a class="btn brass pl-wide" href={booking} target="_blank" rel="nofollow noopener" data-goal={site.goals.booking}>Записаться онлайн</a>}
+          {!s.closed && booking && <a class="btn brass pl-wide" href={booking} target="_blank" rel="nofollow noopener" data-goal={site.goals.booking} data-stat="booking" data-sid={s.id}>Записаться онлайн</a>}
         </div>
         {s.lat && s.lng && <YMap points={[{ title: s.title, lat: s.lat, lng: s.lng, address: s.address }]} zoom={15} height={300} />}
         {mine && !pro && (
