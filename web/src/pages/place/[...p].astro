@@ -11,7 +11,7 @@ import { cleanHtml, strip, clip, rub, phoneHref, ensureUrl, dateRu, plural } fro
 import { site } from '../../data/site';
 import { inCity } from '../../lib/cases';
 import Captcha from '../../components/Captcha.astro';
-import { isPro } from '../../lib/billing';
+import { isPro, PRICE } from '../../lib/billing';
 import '../../styles/forms.css';
 
 const parts = (Astro.params.p || '').split('/').filter(Boolean);
@@ -188,7 +188,7 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
           <div class="panel upsell">
             <p class="eyebrow">Видно только вам</p>
             <p><b>Телефон, сайт и онлайн-запись скрыты</b> — на бесплатном тарифе клиенты их не видят.</p>
-            <a class="btn brass pl-wide" href={`/billing/?id=${s.id}`}>Подключить PRO — 1 990 ₽/мес</a>
+            <a class="btn brass pl-wide" href={`/billing/?id=${s.id}`}>Подключить PRO — {PRICE.pro} ₽/мес</a>
           </div>
         )}
         {colls.length > 0 && <div class="panel"><h2 class="h3">В подборках</h2><div class="chips">{colls.map((c) => <a class="chip" href={`/collection/${c.slug}/`}>{c.name}</a>)}</div></div>}

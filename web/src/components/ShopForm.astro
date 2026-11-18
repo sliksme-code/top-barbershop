@@ -2,6 +2,7 @@
 import '../styles/forms.css';
 import Captcha from './Captcha.astro';
 import { img } from '../lib/img';
+import { PRICE } from '../lib/billing';
 const { refs, v = {}, metroSel = [], submit = 'Сохранить', pro = false } = Astro.props as { refs: any; v?: any; metroSel?: number[]; submit?: string; pro?: boolean };
 const svc = refs.features.filter((f: any) => f.kind === 'service');
 const am = refs.features.filter((f: any) => f.kind === 'amenity');
@@ -46,7 +47,7 @@ const cityPath = refs.locations.find((l: any) => l.id === v.location_id)?.path |
 
   <fieldset disabled={!pro} class={pro ? '' : 'locked'}>
     <legend>Телефон, сайт и онлайн-запись {pro ? <span class="badge top">PRO</span> : <span class="badge">Только PRO</span>}</legend>
-    {!pro && <p class="alt" style="margin:0">На бесплатном тарифе эти данные не показываются клиентам. <a href={v.id ? `/billing/?id=${v.id}` : '/tarify/'}>Подключите PRO за 1 990 ₽/мес</a> — и клиенты смогут звонить, переходить на сайт и записываться онлайн прямо из карточки.</p>}
+    {!pro && <p class="alt" style="margin:0">На бесплатном тарифе эти данные не показываются клиентам. <a href={v.id ? `/billing/?id=${v.id}` : '/tarify/'}>Подключите PRO за {PRICE.pro} ₽/мес</a> — и клиенты смогут звонить, переходить на сайт и записываться онлайн прямо из карточки.</p>}
     <div class="row">
       <label>Телефон <input class="field" name="phone" maxlength="40" value={v.phone} inputmode="tel" /></label>
     </div>

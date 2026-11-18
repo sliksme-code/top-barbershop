@@ -11,6 +11,7 @@ import { sameOrigin, rateLimited, captchaOk, str } from '../lib/forms';
 import { registerUser } from '../lib/register';
 import { sendMail, ADMIN_EMAIL } from '../lib/mail';
 import { shops as shopsWord } from '../lib/text';
+import { PRICE } from '../lib/billing';
 
 const user = Astro.locals.user;
 let errors: string[] = [], v: any = {}, metroSel: number[] = [], regErr = '', reg: any = {};
@@ -90,7 +91,7 @@ const [stat] = user ? [null] : await sql`select count(*)::int shops, count(disti
       </section>
       <section class="section faq">
         <h2>Вопросы</h2>
-        <details><summary>Сколько стоит размещение?</summary><p>Базовая карточка бесплатна навсегда: адрес, фото, описание, цены, отзывы. Телефон, кнопка онлайн-записи и ссылки на сайт — на тарифе PRO за 1 990 ₽ в месяц.</p></details>
+        <details><summary>Сколько стоит размещение?</summary><p>Базовая карточка бесплатна навсегда: адрес, фото, описание, цены, отзывы. Телефон, кнопка онлайн-записи и ссылки на сайт — на тарифе PRO за {PRICE.pro} ₽ в месяц, для сетей от 3 филиалов — {PRICE.proNetwork} ₽ за филиал.</p></details>
         <details><summary>Что такое «Топ города»?</summary><p>Ваш барбершоп показывается в первой тройке на странице города и на страницах станций метро в течение недели. В каждом городе всего 3 места в неделю — свободные недели видны в календаре в личном кабинете.</p></details>
         <details><summary>Мой барбершоп уже есть в каталоге</summary><p>Зарегистрируйтесь, откройте его карточку и нажмите «Это мой барбершоп» — после проверки вы сможете редактировать её и подключить PRO.</p></details>
         <details><summary>У меня сеть барбершопов</summary><p>Добавьте каждый филиал отдельно — у каждого будет своя карточка, адрес на карте и отзывы. Тариф PRO подключается для каждого филиала.</p></details>

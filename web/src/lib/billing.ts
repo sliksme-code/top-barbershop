@@ -1,13 +1,14 @@
 import { sql } from './db';
 
-export const PRICE = { pro: 1990, proNetwork: 1190, priority: 3000 } as const;
-/** Скидка за оплату вперёд: от 6 мес — 15%, от 12 мес — 25% */
-export const discountFor = (months: number) => (months >= 12 ? 25 : months >= 6 ? 15 : 0);
-/** Пакет для сетей: от 2 филиалов в одном заказе — 1 190 ₽/мес за филиал */
-export const NETWORK_MIN = 2;
+export const PRICE = { pro: 990, proNetwork: 690, priority: 3000 } as const;
+/** Скидка за оплату вперёд: от 6 мес — 15%, от 12 мес — 25% (пакет для сетей на год — 30%) */
+export const discountFor = (months: number, network = false) => (months >= 12 ? (network ? 30 : 25) : months >= 6 ? 15 : 0);
+/** Пакет для сетей: от 3 филиалов в одном заказе — 690 ₽/мес за филиал */
+export const NETWORK_MIN = 3;
 export function proQuote(months: number, branches = 1) {
-  const per = branches >= NETWORK_MIN ? PRICE.proNetwork : PRICE.pro;
-  const disc = discountFor(months);
+  const net = branches >= NETWORK_MIN;
+  const per = net ? PRICE.proNetwork : PRICE.pro;
+  const disc = discountFor(months, net);
   const full = per * months * branches;
   const total = Math.round((full * (100 - disc)) / 100);
   return { per, disc, full, total, monthly: Math.round(total / months / branches) };
