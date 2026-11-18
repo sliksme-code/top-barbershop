@@ -12,6 +12,7 @@ import { registerUser } from '../lib/register';
 import { sendMail, ADMIN_EMAIL } from '../lib/mail';
 import { shops as shopsWord } from '../lib/text';
 import { PRICE } from '../lib/billing';
+import { breadcrumbLd } from '../lib/seo';
 
 const user = Astro.locals.user;
 let errors: string[] = [], v: any = {}, metroSel: number[] = [], regErr = '', reg: any = {};
@@ -48,7 +49,7 @@ const [stat] = user ? [null] : await sql`select count(*)::int shops, count(disti
     <ShopForm refs={refs} {v} {metroSel} submit="Отправить на модерацию" />
   </AccountLayout>
 ) : (
-  <Base title="Добавить барбершоп в каталог бесплатно — TOP BARBERSHOP" description={`Разместите барбершоп в крупнейшем каталоге России и СНГ: ${stat.shops} барбершопов в ${stat.cities} городах. Бесплатная карточка, тариф PRO с телефоном и онлайн-записью, топ города.`}>
+  <Base title="Добавить барбершоп в каталог бесплатно — TOP BARBERSHOP" jsonLd={[breadcrumbLd([['Главная', '/'], ['Добавить барбершоп']]), { '@context': 'https://schema.org', '@type': 'Service', name: 'Размещение барбершопа в каталоге TOP BARBERSHOP', provider: { '@type': 'Organization', name: 'TOP BARBERSHOP' }, offers: [{ '@type': 'Offer', name: 'Базовый', price: 0, priceCurrency: 'RUB' }, { '@type': 'Offer', name: 'PRO', price: PRICE.pro, priceCurrency: 'RUB' }] }]} description={`Разместите барбершоп в крупнейшем каталоге России и СНГ: ${stat.shops} барбершопов в ${stat.cities} городах. Бесплатная карточка, тариф PRO с телефоном и онлайн-записью, топ города.`}>
     <section class="pr-hero">
       <div class="wrap pr-in">
         <div class="pr-txt">

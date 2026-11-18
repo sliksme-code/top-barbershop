@@ -22,8 +22,8 @@ const facts: [string, string | null][] = x ? ('school' === 'school'
   ? [['Город', x.city], ['Адрес', x.address], ['Длительность', x.duration], ['Обучение с нуля', x.from_zero], ['Рассрочка / кредит', x.credit], ['Инструменты', x.tools]]
   : [['Город', x.city], ['Барбершоп', x.barbershop_name], ['Адрес', x.address], ['График', x.schedule], ['Зарплата', x.salary]]) : [];
 ---
-<Base title={x ? `${x.title} — ${'school' === 'school' ? 'курсы барберов' : 'вакансия барбера'}${x.city ? ', ' + x.city : ''}` : city ? `Школы барберов — ${city.name}` : 'Курсы барберов — школы обучения мужским стрижкам'}
-  description={x ? clip(strip(x.content) || x.title, 200) : 'Школы барберов и курсы мужских стрижек: программа, длительность, обучение с нуля, адреса и контакты.'} jsonLd={breadcrumbLd(crumbs)}>
+<Base title={x ? `${x.title} — ${'school' === 'school' ? 'курсы барберов' : 'вакансия барбера'}${x.city ? ', ' + x.city : ''}` : city ? `Курсы барберов — ${city.name}: обучение мужским стрижкам` : 'Курсы барберов — школы обучения мужским стрижкам'}
+  description={x ? clip(strip(x.content) || x.title, 200) : city ? `Школы и курсы барберов — ${city.name}: адреса, условия и контакты. Актуальные предложения в каталоге TOP BARBERSHOP.` : 'Школы барберов и курсы мужских стрижек: программа, длительность, обучение с нуля, адреса и контакты.'} jsonLd={breadcrumbLd(crumbs)}>
   <div class="wrap">
     <Crumbs items={crumbs} />
     {x ? (

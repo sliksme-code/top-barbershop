@@ -3,9 +3,10 @@ import Base from '../layouts/Base.astro';
 import Crumbs from '../components/Crumbs.astro';
 import Requisites from '../components/Requisites.astro';
 import { PRICE, SELLER } from '../lib/billing';
+import { breadcrumbLd } from '../lib/seo';
 const crumbs: [string, string?][] = [['Главная', '/'], ['Публичная оферта']];
 ---
-<Base title="Публичная оферта на платные услуги — TOP BARBERSHOP" description="Условия оказания платных услуг сервиса TOP BARBERSHOP для владельцев барбершопов: тариф PRO и размещение в топе города.">
+<Base title="Публичная оферта на платные услуги — TOP BARBERSHOP" description="Условия оказания платных услуг сервиса TOP BARBERSHOP для владельцев барбершопов: тариф PRO и размещение в топе города." jsonLd={breadcrumbLd(crumbs)}>
   <div class="wrap">
     <Crumbs items={crumbs} />
     <article class="prose">

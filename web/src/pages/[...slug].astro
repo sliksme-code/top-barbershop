@@ -16,6 +16,7 @@ if (parts.length === 2 && /^(amp|feed|embed|trackback|\d+|comment-page-\d+)$/.te
 if (parts.length !== 1) return Astro.rewrite('/404/');
 const slug = decodeURIComponent(parts[0]);
 if (slug === 'home') return Astro.redirect('/', 301);
+if (/^(poin|barbaro)/.test(slug)) return new Response('Gone', { status: 410 });
 if (slug === 'owners') return Astro.redirect('/add/', 301);
 if (slug === 'faq') return Astro.redirect('/tarify/', 301);
 

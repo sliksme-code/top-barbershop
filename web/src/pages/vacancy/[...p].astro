@@ -22,8 +22,8 @@ const facts: [string, string | null][] = x ? ('vacancy' === 'school'
   ? [['Город', x.city], ['Адрес', x.address], ['Длительность', x.duration], ['Обучение с нуля', x.from_zero], ['Рассрочка / кредит', x.credit], ['Инструменты', x.tools]]
   : [['Город', x.city], ['Барбершоп', x.barbershop_name], ['Адрес', x.address], ['График', x.schedule], ['Зарплата', x.salary]]) : [];
 ---
-<Base title={x ? `${x.title} — ${'vacancy' === 'school' ? 'курсы барберов' : 'вакансия барбера'}${x.city ? ', ' + x.city : ''}` : city ? `Вакансии — ${city.name}` : 'Работа барбером — вакансии в барбершопах'}
-  description={x ? clip(strip(x.content) || x.title, 200) : 'Вакансии барберов и администраторов в барбершопах: зарплата, график, адреса и контакты работодателей.'} jsonLd={breadcrumbLd(crumbs)}>
+<Base title={x ? `${x.title} — ${'vacancy' === 'school' ? 'курсы барберов' : 'вакансия барбера'}${x.city ? ', ' + x.city : ''}` : city ? `Вакансии барбера — ${city.name}: работа в барбершопах` : 'Работа барбером — вакансии в барбершопах'}
+  description={x ? clip(strip(x.content) || x.title, 200) : city ? `Вакансии барберов и администраторов барбершопов — ${city.name}: адреса, условия и контакты. Актуальные предложения в каталоге TOP BARBERSHOP.` : 'Вакансии барберов и администраторов в барбершопах: зарплата, график, адреса и контакты работодателей.'} jsonLd={breadcrumbLd(crumbs)}>
   <div class="wrap">
     <Crumbs items={crumbs} />
     {x ? (

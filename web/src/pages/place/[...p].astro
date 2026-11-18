@@ -57,8 +57,10 @@ const descText = strip(s.description);
 const strizh = s.services?.strizh ? rub(s.services.strizh) : null;
 const cityRe = s.city ? new RegExp('^(г\\.?\\s*|город\\s*)?' + s.city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*,?\\s*', 'i') : null;
 const street = (cityRe ? (s.address || '').replace(cityRe, '') : s.address || '').replace(/^(г\.?|город)\s*[^,]+,\s*/i, '').split(',').slice(0, 2).join(',').trim();
-const place = metroNames[0] ? `м. ${metroNames[0]}` : street;
-const head = `${s.title} — барбершоп${s.city ? ' ' + inCity(s.city).replace(/^— /, ', ') : ''}`;
+const place = twins && street ? street : metroNames[0] ? `м. ${metroNames[0]}` : street;
+const name = String(s.title).replace(/\s+/g, ' ').trim().slice(0, 50).replace(/\s+\S*$/, (m) => (String(s.title).replace(/\s+/g, ' ').trim().length > 50 ? '' : m));
+const [{ twins }] = await sql`select count(*)::int twins from barbershops where status = 'published' and location_id = ${s.location_id} and lower(title) = lower(${s.title}) and id <> ${s.id}`;
+const head = `${name} — барбершоп${s.city ? ' ' + inCity(s.city).replace(/^— /, ', ') : ''}`;
 const titleCore = place && (head + ', ' + place).length <= 72 ? `${head}, ${place}` : head;
 const title = s.seo_title || [': цены, отзывы, запись', ': цены и отзывы', ''].map((x) => titleCore + x).find((t) => t.length <= 75) || titleCore;
 const description = clip(s.seo_description || [`${s.title} — барбершоп${s.address ? ' по адресу ' + s.address : ''}${s.city ? ', ' + s.city : ''}.`, strizh ? `Мужская стрижка — ${strizh}.` : '', descText].filter(Boolean).join(' '), 200);
@@ -206,7 +208,7 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
           </div>
         )}
         {colls.length > 0 && <div class="panel"><h2 class="h3">В подборках</h2><div class="chips">{colls.map((c) => <a class="chip" href={`/collection/${c.slug}/`}>{c.name}</a>)}</div></div>}
-        {!mine && <p class="muted pl-note">Вы владелец? <a href={`/claim/?id=${s.id}`} rel="nofollow">Это мой барбершоп</a> — получите доступ к карточке.</p>}
+        {!mine && <><p class="muted pl-note">Вы владелец?</p><form action="/claim/" method="get" class="claim-f"><input type="hidden" name="id" value={s.id} /><button class="btn ghost sm">Это мой барбершоп</button></form><p class="muted pl-note">Получите доступ к карточке: фото, цены, описание.</p></>}
       </aside>
     </div>
 
@@ -261,6 +263,7 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
 .rv{border-top:1px solid var(--line);padding:16px 0}.rv:first-of-type{border-top:0}
 .rv-h{margin-bottom:6px}
 
+.claim-f{margin:6px 0 0}
 .upsell{border-color:var(--brass);background:#fffaf0}.upsell p{margin:0 0 8px}
 .fav.on{background:var(--ink);color:#fff}
 .rv-form{margin-top:12px}.rv-form summary{list-style:none;display:inline-flex}.rv-form summary::-webkit-details-marker{display:none}.rv-form form{margin-top:16px}

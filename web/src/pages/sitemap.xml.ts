@@ -8,7 +8,7 @@ export const GET: APIRoute = async () => {
     sql`select distinct m.slug from metro m join barbershop_metro bm on bm.metro_id=m.id join barbershops b on b.id=bm.barbershop_id and b.status='published'`,
     sql`select distinct c.slug from chains c join barbershops b on b.chain_id=c.id and b.status='published' where c.name ~ '[[:alpha:]]'`,
     sql`select slug from collections`,
-    sql`select slug, coalesce(updated_at, published_at) d from posts where status='published' and not coalesce(noindex,false)`,
+    sql`select slug, coalesce(updated_at, published_at) d from posts where status='published' and not coalesce(noindex,false) and slug !~ '^(poin|barbaro)'`,
     sql`select slug, updated_at d from pages where status='published' and not coalesce(noindex,false) and coalesce(template,'') not like 'page-dashboard%' and slug not in ('home','login','register','logout','remove','mc4wp-form-preview','sp','setup','fuck-coronavirus-stay-home','clipperkillah-28-oktyabrya-spb','event-directory','terms-of-use','payment','barbaro','faq','owners','dobavit-vakansiyu','my-watchdogs','invoices','transactions','report-spam-abuse-or-inappropriate-content','add','edit','my','my-favorites','change-password','logout','login','register') and slug !~ '^poin'`,
     sql`select slug from school_cities c where exists (select 1 from schools s where s.city_id = c.id and s.status='published')`,
     sql`select slug from vacancy_cities c where exists (select 1 from vacancies v where v.city_id = c.id and v.status='published')`,
