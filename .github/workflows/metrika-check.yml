@@ -1,0 +1,27 @@
+name: metrika-check
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npm i playwright@1 >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
+      - run: |
+          cat > m.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const b = await chromium.launch(); const pg = await b.newPage({ locale: 'ru-RU' });
+          const hits = []; pg.on('request', r => { const u = r.url(); if (/mc\.yandex\.(ru|com)/.test(u)) hits.push(r.method() + ' ' + u.split('?')[0] + (u.includes('page-url') ? ' [hit]' : '')); });
+          for (const p of ['/', '/place/portos/', '/location/russia/msk/']) {
+            hits.length = 0;
+            await pg.goto('https://top-barbershop.com' + p, { waitUntil: 'networkidle' }); await pg.waitForTimeout(4000);
+            const st = await pg.evaluate(() => ({ ym: typeof ym, id: window.Ya?._metrika?.counters ? Object.keys(Ya._metrika.counters) : null, inits: [...document.scripts].filter(s => s.textContent.includes('"init"')).length, tags: [...document.scripts].filter(s => s.src.includes('tag.js')).length, noscript: document.querySelectorAll('noscript').length }));
+            console.log(p, JSON.stringify(st)); console.log('  ' + [...new Set(hits)].join('\n  '));
+          }
+          // цель: клик по «Записаться онлайн»
+          await pg.goto('https://top-barbershop.com/place/portos/', { waitUntil: 'networkidle' }); await pg.waitForTimeout(3000); hits.length = 0;
+          const [popup] = await Promise.all([pg.waitForEvent('popup').catch(() => null), pg.click('[data-goal="online"] >> nth=0')]);
+          await pg.waitForTimeout(3000);
+          console.log('goal click:\n  ' + hits.filter(h => /watch/.test(h)).join('\n  '));
+          const goalReq = []; 
+          await b.close();
+          JS
+          node m.mjs
