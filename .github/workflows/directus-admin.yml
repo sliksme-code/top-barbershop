@@ -41,6 +41,5 @@ jobs:
               $Q "update directus_users set role = '$ROLE', status = 'active' where lower(email) = lower('$ADMIN_EMAIL')"
             fi
             $Q "select u.email, u.status, r.name from directus_users u left join directus_roles r on r.id = u.role where lower(u.email) = lower('$ADMIN_EMAIL')"
-            # проверка входа
-            CODE=$(docker compose exec -T -e PW="$ADMIN_PW" -e EM="$ADMIN_EMAIL" directus sh -c 'wget -qO- --header="Content-Type: application/json" --post-data="{\"email\":\"$EM\",\"password\":\"$PW\"}" http://localhost:8055/auth/login >/dev/null 2>&1 && echo OK || echo FAIL')
-            echo "вход в Directus: $CODE"
+            # проверка входа (node внутри контейнера Directus)
+            docker compose exec -T -e PW="$ADMIN_PW" -e EM="$ADMIN_EMAIL" directus node -e 'fetch("http://localhost:8055/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:process.env.EM,password:process.env.PW})}).then(async r=>{const j=await r.json();console.log("вход в Directus:", r.status, j.data?.access_token ? "OK, токен получен" : JSON.stringify(j.errors?.[0]?.message||j))})'
