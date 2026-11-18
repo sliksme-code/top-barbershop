@@ -172,7 +172,9 @@ export function startPaymentReminders() {
     if (!mailEnabled) return;
     const rows = await sql`select o.id, u.email from orders o join site_users u on u.id = o.user_id
       where o.status = 'pending' and o.reminded_at is null and u.email is not null
-        and o.created_at < now() - interval '1 hour' and o.created_at > now() - interval '3 days' order by o.id limit 20`;
+        and o.created_at < now() - interval '1 hour' and o.created_at > now() - interval '3 days'
+        and not exists (select 1 from orders p where p.user_id = o.user_id and p.barbershop_id = o.barbershop_id and p.kind = o.kind and p.status = 'paid' and p.id > o.id)
+      order by o.id limit 20`;
     for (const r of rows) {
       const [claim] = await sql`update orders set reminded_at = now() where id = ${r.id} and reminded_at is null returning id`;
       if (!claim) continue;
