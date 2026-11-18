@@ -25,10 +25,6 @@
 			file_server
 		}
 	}
-	handle_path /logos/* {
-		root * /srv/logos
-		file_server
-	}
 	handle_path /wp-content/uploads/* {
 		root * /srv/uploads
 		# служебные файлы, случайно попавшие в uploads, не отдаём
