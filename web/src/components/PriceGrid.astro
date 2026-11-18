@@ -1,0 +1,45 @@
+---
+// Сетка цен: считается теми же функциями, что и заказы (proQuote), — расхождений быть не может.
+import { PRICE, PRO_PERIODS, NETWORK_MIN, proQuote } from '../lib/billing';
+const rub = (n: number) => n.toLocaleString('ru-RU') + ' ₽';
+const rows = PRO_PERIODS.map((m) => ({ m, one: proQuote(m, 1), net: proQuote(m, NETWORK_MIN) }));
+const mon = (m: number) => `${m} ${m === 1 ? 'месяц' : m < 5 ? 'месяца' : 'месяцев'}`;
+---
+<section class="panel pg" id="prices">
+  <h2 class="h3">Цены</h2>
+  <div class="pg-wrap">
+    <table class="pg-t">
+      <thead>
+        <tr><th rowspan="2">Срок</th><th colspan="3">PRO · 1–{NETWORK_MIN - 1} барбершопа</th><th colspan="3" class="pg-net">Пакет для сетей · от {NETWORK_MIN} филиалов</th></tr>
+        <tr><th>За срок</th><th>В месяц</th><th>Скидка</th><th class="pg-net">За срок, филиал</th><th class="pg-net">В месяц</th><th class="pg-net">Скидка</th></tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr class={r.m === 12 ? 'best' : ''}>
+            <th scope="row">{mon(r.m)}</th>
+            <td><b>{rub(r.one.total)}</b></td><td>{rub(r.one.monthly)}</td><td>{r.one.disc ? `−${r.one.disc}%` : '—'}</td>
+            <td class="pg-net"><b>{rub(r.net.total / NETWORK_MIN)}</b></td><td class="pg-net">{rub(r.net.monthly)}</td><td class="pg-net">{r.net.disc ? <span class="pg-d">−{r.net.disc}%</span> : '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+  <div class="pg-x">
+    <p><b>Топ города</b> — {rub(PRICE.priority)} за неделю (пн–вс), 3 места на город. Бронь в календаре у каждого барбершопа ниже.</p>
+    <p class="muted">Пример: сеть из 5 филиалов на год — 5 × {rub(proQuote(12, 5).total / 5)} = <b>{rub(proQuote(12, 5).total)}</b> вместо {rub(PRICE.pro * 12 * 5)} по базовой цене PRO.</p>
+  </div>
+</section>
+<style>
+.pg{max-width:1000px;margin-bottom:18px}
+.pg-wrap{overflow-x:auto;margin:0 -4px}
+.pg-t{width:100%;border-collapse:collapse;font-size:15px;min-width:620px}
+.pg-t th,.pg-t td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.pg-t thead th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+.pg-t thead tr:first-child th{color:var(--ink);font-size:13px;text-align:center;border-bottom:0}
+.pg-t th[scope=row],.pg-t thead tr:first-child th:first-child{text-align:left}
+.pg-t .pg-net{background:#fffaf0}
+.pg-t tr.best td,.pg-t tr.best th{border-bottom:0}
+.pg-t tr.best{box-shadow:inset 0 0 0 2px var(--brass)}
+.pg-d{background:var(--brass);color:#16120c;border-radius:6px;padding:2px 6px;font-weight:700}
+.pg-x{margin-top:12px}.pg-x p{margin:0 0 6px}
+</style>

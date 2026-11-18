@@ -2,6 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Crumbs from '../components/Crumbs.astro';
 import Pricing from '../components/Pricing.astro';
+import PriceGrid from '../components/PriceGrid.astro';
 import { breadcrumbLd } from '../lib/seo';
 const crumbs: [string, string?][] = [['Главная', '/'], ['Тарифы для владельцев']];
 ---
@@ -11,6 +12,7 @@ const crumbs: [string, string?][] = [['Главная', '/'], ['Тарифы д�
     <h1>Тарифы для владельцев барбершопов</h1>
     <p class="muted" style="max-width:720px">Добавить барбершоп в каталог — бесплатно. Платите, только если хотите, чтобы клиенты звонили и записывались к вам прямо из карточки.</p>
     <Pricing />
+    <div style="margin-top:24px"><PriceGrid /></div>
     <p style="text-align:center;margin-top:28px"><a class="btn brass" href="/add/">Добавить барбершоп</a></p>
   </div>
 </Base>

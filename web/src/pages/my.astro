@@ -12,6 +12,7 @@ const st: Record<string, string> = { published: 'Опубликован', pendin
 const saved = Astro.url.searchParams.get('saved');
 ---
 <AccountLayout title="Мои барбершопы" active="/my/">
+  <p class="alt" style="max-width:900px">Тариф PRO — 990 ₽/мес, для сетей от 3 филиалов — 690 ₽/мес за филиал. <a href="/billing/#prices">Все цены и скидки</a></p>
   {Astro.url.searchParams.get('welcome') && <p class="msg ok">Добро пожаловать{user.display_name ? ', ' + user.display_name : ''}! Добавьте свой барбершоп или найдите его в каталоге и нажмите «Это мой барбершоп».</p>}
   {saved === 'new' && <p class="msg ok">Барбершоп отправлен на модерацию. Мы опубликуем его после проверки.</p>}
   {saved === '1' && <p class="msg ok">Изменения сохранены.</p>}

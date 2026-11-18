@@ -6,6 +6,7 @@ import { sameOrigin, str } from '../lib/forms';
 import { sendMail, ADMIN_EMAIL } from '../lib/mail';
 import { PRICE, PRO_PERIODS, SELLER, NETWORK_MIN, proQuote, isPro, priorityCalendar, createProOrder, reservePriority, startPayment, paymentsEnabled, syncPayment, weekLabel } from '../lib/billing';
 import { dateRu, plural } from '../lib/text';
+import PriceGrid from '../components/PriceGrid.astro';
 
 const user = Astro.locals.user;
 if (!user) return Astro.redirect('/login/?next=' + encodeURIComponent(Astro.url.pathname + Astro.url.search));
@@ -61,6 +62,7 @@ const ST: Record<string, string> = { pending: 'ожидает оплаты', pai
 <AccountLayout title="Тариф и продвижение" active="/billing/">
   {msg && <p class={`msg ${msg[0]}`}>{msg[1]}</p>}
   {shops.length === 0 && <div class="panel" style="max-width:720px"><p>Сначала <a href="/add/">добавьте барбершоп</a> или заявите права на существующий кнопкой «Это мой барбершоп» в его карточке.</p></div>}
+  <PriceGrid />
   {shops.length >= NETWORK_MIN && (
     <form method="post" class="panel net" id="network">
       <input type="hidden" name="action" value="network" />
