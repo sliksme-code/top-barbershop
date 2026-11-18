@@ -85,6 +85,8 @@ jobs:
               v=$(printenv "$k" | tr -d '\r\n' || true)
               if [ -n "$v" ]; then sed -i "/^$k=/d" .env; printf '%s=%s\n' "$k" "$v" >> .env; echo "$k: задан отдельным секретом"; fi
             done
+            # переменные окружения шелла перекрывают .env в docker compose — убираем их
+            unset ENV_FILE SMTP_PASSWORD ADMIN_NOTIFY_EMAIL SMARTCAPTCHA_SERVER_KEY
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             WEB_TAG=${{ github.sha }} docker compose pull web caddy
             WEB_TAG=${{ github.sha }} docker compose up -d --remove-orphans
