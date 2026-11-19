@@ -115,9 +115,6 @@ if (view === 'type' && t) {
   ld.push({ '@context': 'https://schema.org', '@type': 'HowTo', name: `Как пользоваться: ${t.name.toLowerCase()}`, step: t.howto.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, text: s })) });
   ld.push({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: t.faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) });
 }
-if (view === 'product' && product) {
-  ld.push({ '@context': 'https://schema.org', '@type': 'Product', name: `${product.brand} ${product.name}`, brand: { '@type': 'Brand', name: product.brand }, description: product.description, url: abs(productUrl(product)), category: t?.name });
-}
 if ((view === 'type' || view === 'collection') && list.length) {
   ld.push({ '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: list.map((p, i) => ({ '@type': 'ListItem', position: i + 1, url: abs(productUrl(p)), name: `${p.brand} ${p.name}` })) });
 }
