@@ -26,7 +26,7 @@ const { cta = true } = Astro.props;
       <li><b>Кнопка «Записаться онлайн»</b> — YCLIENTS, DIKIDI и др.</li>
       <li><b>Ссылки на сайт</b> и соцсети</li>
     </ul>
-    <p class="prc-d">Оплата вперёд: <b>6 мес — −15%</b> ({proQuote(6).monthly.toLocaleString('ru-RU')} ₽/мес), <b>12 мес — −25%</b> ({proQuote(12).monthly.toLocaleString('ru-RU')} ₽/мес)</p>
+    <p class="prc-d">Размещение <b>от 3 месяцев</b> — {proQuote(3).total.toLocaleString('ru-RU')} ₽. Оплата вперёд: <b>6 мес — −15%</b> ({proQuote(6).monthly.toLocaleString('ru-RU')} ₽/мес), <b>12 мес — −25%</b> ({proQuote(12).monthly.toLocaleString('ru-RU')} ₽/мес)</p>
   </div>
   <div class="prc-c">
     <p class="eyebrow">Для сетей</p>
@@ -34,7 +34,7 @@ const { cta = true } = Astro.props;
     <p class="prc-p">{PRICE.proNetwork.toLocaleString('ru-RU')} ₽ <small>/ мес за филиал</small></p>
     <ul>
       <li>Всё из PRO для каждого филиала</li>
-      <li>От <b>{NETWORK_MIN} филиалов</b> в одном заказе</li>
+      <li>От <b>{NETWORK_MIN} филиалов</b> в одном заказе, срок — от 3 месяцев</li>
       <li>Годовой пакет — <b>−30%</b>: {proQuote(12, NETWORK_MIN).monthly.toLocaleString('ru-RU')} ₽/мес за филиал</li>
       <li>6 мес — −15%: {proQuote(6, NETWORK_MIN).monthly.toLocaleString('ru-RU')} ₽/мес за филиал</li>
     </ul>

@@ -35,7 +35,7 @@ if (Astro.request.method === 'POST') {
   else if (action === 'network' && netShops.length < NETWORK_MIN) msg = ['err', `Пакет для сетей — от ${NETWORK_MIN} филиалов. Для одного барбершопа подключите PRO в его карточке ниже.`];
   else {
     let res: any = null, what = '';
-    const months = Number(f.get('months')) || 1;
+    const months = Number(f.get('months')) || 3;
     if (action === 'pro') {
       res = { order: await createProOrder(user.id, [shop.id], months) };
       what = `PRO для «${shop.title}» на ${months} мес`;
@@ -65,7 +65,7 @@ const ST: Record<string, string> = { pending: 'ожидает оплаты', pai
   {shops.length >= NETWORK_MIN && (
     <form method="post" class="panel net" id="network">
       <input type="hidden" name="action" value="network" />
-      <div class="bl-h"><div><p class="eyebrow">Пакет для сетей</p><h2>PRO для всех филиалов — {PRICE.proNetwork.toLocaleString('ru-RU')} ₽/мес за филиал</h2><p class="muted">Вместо {PRICE.pro.toLocaleString('ru-RU')} ₽ — при оплате от {NETWORK_MIN} филиалов одним заказом. Оплата вперёд: 6 мес — −15%, год — −30%.</p></div></div>
+      <div class="bl-h"><div><p class="eyebrow">Пакет для сетей</p><h2>PRO для всех филиалов — {PRICE.proNetwork.toLocaleString('ru-RU')} ₽/мес за филиал</h2><p class="muted">Вместо {PRICE.pro.toLocaleString('ru-RU')} ₽ — при оплате от {NETWORK_MIN} филиалов одним заказом. Срок — от 3 месяцев; 6 мес — −15%, год — −30%.</p></div></div>
       <div class="net-shops">{shops.map((s) => <label class="check"><input type="checkbox" name="shops" value={s.id} checked /> {s.title}{s.city ? `, ${s.city}` : ''}{isPro(s) && <small class="muted"> · PRO до {dateRu(s.pro_until)}</small>}</label>)}</div>
       <div class="bl-row" style="margin-top:12px">
         <select class="field" name="months" aria-label="Срок">{PRO_PERIODS.map((m) => <option value={m} selected={m === 12}>{m} мес.{proQuote(m, NETWORK_MIN).disc ? ` (−${proQuote(m, NETWORK_MIN).disc}%)` : ''}</option>)}</select>
@@ -86,7 +86,7 @@ const ST: Record<string, string> = { pending: 'ожидает оплаты', pai
           <div class="bl-grid">
             <form method="post" class="bl-box">
               <h3>Тариф PRO · {PRICE.pro.toLocaleString('ru-RU')} ₽/мес</h3>
-              <p class="alt" style="margin:0 0 8px">Скидка за оплату вперёд: 6 мес — −15%, 12 мес — −25%.</p>
+              <p class="alt" style="margin:0 0 8px">Размещение от 3 месяцев. Скидка за оплату вперёд: 6 мес — −15%, 12 мес — −25%.</p>
               <ul class="bl-l"><li>Телефон с кнопкой звонка</li><li>Кнопка «Записаться онлайн»</li><li>Ссылки на сайт и соцсети</li></ul>
               <input type="hidden" name="action" value="pro" /><input type="hidden" name="shop" value={s.id} />
               <div class="bl-row">

@@ -13,7 +13,9 @@ export function proQuote(months: number, branches = 1) {
   const total = Math.round((full * (100 - disc)) / 100);
   return { per, disc, full, total, monthly: Math.round(total / months / branches) };
 }
-export const PRO_PERIODS = [1, 3, 6, 12] as const;
+/** Минимальный срок размещения PRO — 3 месяца */
+export const PRO_PERIODS = [3, 6, 12] as const;
+export const MIN_MONTHS = PRO_PERIODS[0];
 export const PRIORITY_SLOTS = 3;
 export const SELLER = {
   name: 'ИП Галиуллин Марат Рамилевич',
@@ -50,7 +52,7 @@ export async function priorityCalendar(locationId: number, shopId: number, weeks
 }
 
 export async function createProOrder(userId: number, shopIds: number[], months: number) {
-  const m = (PRO_PERIODS as readonly number[]).includes(months) ? months : 1;
+  const m = (PRO_PERIODS as readonly number[]).includes(months) ? months : MIN_MONTHS;
   const ids = [...new Set(shopIds)].filter(Boolean);
   const q = proQuote(m, ids.length);
   const [o] = await sql`insert into orders (user_id, barbershop_id, shop_ids, kind, months, amount, discount)
