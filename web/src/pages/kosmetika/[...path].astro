@@ -1,0 +1,482 @@
+---
+import Base from '../../layouts/Base.astro';
+import Crumbs from '../../components/Crumbs.astro';
+import ShopCard from '../../components/ShopCard.astro';
+import Pager from '../../components/Pager.astro';
+import { sql } from '../../lib/db';
+import { breadcrumbLd, abs } from '../../lib/seo';
+import { listShops, inLocation, splitPage } from '../../lib/catalog';
+import { inCity } from '../../lib/cases';
+import { shops as shopsWord } from '../../lib/text';
+import {
+  BRANCHES, TYPES, LABEL, HAIRCUTS, COMPARISONS, COLLECTIONS, allProducts, productUrl, typeUrl, findType, typeOfProduct, specLine, type Product,
+} from '../../lib/cosmetics';
+
+const { parts, page } = splitPage(Astro.params.path);
+const products = await allProducts();
+const byType = (keys: string[]) => products.filter((p) => keys.includes(p.type));
+const root: [string, string?] = ['Косметика', '/kosmetika/'];
+const home: [string, string?] = ['Главная', '/'];
+
+let view = '';
+let crumbs: [string, string?][] = [home];
+let title = '', description = '', h1 = '';
+let ld: any[] = [];
+let branchKey = '', typeKey = '', cmpKey = '', colKey = '';
+let product: Product | undefined;
+let list: Product[] = [];
+let city: any = null, cityData: any = null, cities: any[] = [];
+
+const p0 = parts[0], p1 = parts[1];
+if (parts.length === 0 && page === 1) {
+  view = 'hub';
+  crumbs.push(['Косметика']);
+  h1 = 'Косметика для волос и бороды: как подобрать';
+  title = 'Как подобрать мужскую косметику для волос и бороды — гид TOP BARBERSHOP';
+  description = 'Гид по барберской косметике: как выбрать средство для укладки, уход за бородой и бритьё. Подбор за 4 вопроса, сравнения, подборки и где купить в барбершопах.';
+} else if (p0 === 'podbor' && parts.length === 1) {
+  view = 'podbor';
+  crumbs.push(root, ['Подбор средства']);
+  h1 = 'Подбор средства для волос и бороды';
+  title = 'Как выбрать средство для укладки волос мужчине — подбор за 4 вопроса';
+  description = 'Ответьте на 4 вопроса о волосах или бороде и получите тип средства и подходящие позиции из каталога с объяснением.';
+} else if (p0 === 'p' && p1 && parts.length === 2) {
+  product = products.find((p) => p.slug === p1);
+  if (product) {
+    view = 'product';
+    typeKey = typeOfProduct(product.type);
+    const t = TYPES[typeKey];
+    crumbs.push(root, [BRANCHES[product.branch].name, `/kosmetika/${product.branch}/`]);
+    if (t) crumbs.push([t.name, typeUrl(typeKey)]);
+    crumbs.push([`${product.brand} ${product.name}`]);
+    h1 = `${product.brand} ${product.name}`;
+    title = `${product.brand} ${product.name}: ${t ? t.name.toLowerCase() : 'средство'}, характеристики и как пользоваться`;
+    description = product.description.slice(0, 180);
+  }
+} else if (BRANCHES[p0] && parts.length === 1 && page === 1) {
+  view = 'branch'; branchKey = p0;
+  const b = BRANCHES[p0];
+  crumbs.push(root, [b.name]);
+  h1 = b.h1; title = b.title; description = b.description;
+} else if (BRANCHES[p0] && p1 && parts.length === 2) {
+  const k = findType(p0, p1);
+  if (k) {
+    view = 'type'; typeKey = k; branchKey = p0;
+    const t = TYPES[k];
+    crumbs.push(root, [BRANCHES[p0].name, `/kosmetika/${p0}/`], [t.name]);
+    h1 = t.h1; title = t.title; description = t.description;
+    list = byType(t.productTypes);
+  }
+} else if (COMPARISONS[p0] && parts.length === 1) {
+  view = 'compare'; cmpKey = p0;
+  const c = COMPARISONS[p0];
+  crumbs.push(root, [c.h1]);
+  h1 = c.h1; title = c.title; description = c.description;
+} else if (p0 === 'podborki' && parts.length === 1) {
+  view = 'collections';
+  crumbs.push(root, ['Подборки']);
+  h1 = 'Подборки мужской косметики';
+  title = 'Наборы мужской косметики под задачу: укладка, борода, бритьё, подарок';
+  description = 'Готовые подборки средств: первая укладка, короткие стрижки, флоу, тонкие и кудрявые волосы, уход за бородой, классическое бритьё, подарок мужчине.';
+} else if (p0 === 'podborki' && p1 && COLLECTIONS[p1] && parts.length === 2) {
+  view = 'collection'; colKey = p1;
+  const c = COLLECTIONS[p1];
+  crumbs.push(root, ['Подборки', '/kosmetika/podborki/'], [c.name]);
+  h1 = c.h1; title = `${c.h1} — подборка средств`; description = `${c.intro} ${c.who}.`.slice(0, 190);
+  list = products.filter(c.pick);
+} else if (p0 === 'gde-kupit' && parts.length === 1 && page === 1) {
+  view = 'cities';
+  crumbs.push(root, ['Где купить']);
+  h1 = 'Где купить барберскую косметику';
+  title = 'Где купить барберскую косметику: барбершопы, которые продают средства';
+  description = 'Барбершопы, где продают косметику для укладки и ухода за бородой: список по городам из каталога TOP BARBERSHOP.';
+  cities = await sql`select l.path, l.name, count(*)::int n from barbershops b join locations l on l.id = b.location_id
+    where b.status = 'published' and not coalesce(b.closed,false) and b.amenities ? 'cosmet' and l.path like 'russia/%' group by l.path, l.name order by n desc limit 40`;
+} else if (p0 === 'gde-kupit' && parts.length > 1) {
+  const path = parts.slice(1).join('/');
+  [city] = await sql`select * from locations where path = ${path}`;
+  if (city) {
+    view = 'city';
+    cityData = await listShops(sql`not coalesce(b.closed,false) and b.amenities ? 'cosmet' and ${inLocation(path)}`, page, 24);
+    if (page > cityData.pages) view = '';
+    crumbs.push(root, ['Где купить', '/kosmetika/gde-kupit/'], [city.name]);
+    h1 = `Где купить барберскую косметику ${inCity(city.name)}`;
+    title = `Барберская косметика ${inCity(city.name)}: где купить — ${shopsWord(cityData.total)}`;
+    description = `Барбершопы ${inCity(city.name)}, где продают средства для укладки волос и ухода за бородой. Адреса, рейтинги и онлайн-запись.`;
+    if (page > 1) title += ` — страница ${page}`;
+  }
+}
+if (!view) return Astro.rewrite('/404/');
+ld.push(breadcrumbLd(crumbs));
+
+const holdBar = (n: number | null) => (n ? '●'.repeat(n) + '○'.repeat(5 - n) : '—');
+const t = typeKey ? TYPES[typeKey] : null;
+if (view === 'type' && t) {
+  ld.push({ '@context': 'https://schema.org', '@type': 'HowTo', name: `Как пользоваться: ${t.name.toLowerCase()}`, step: t.howto.map((s, i) => ({ '@type': 'HowToStep', position: i + 1, text: s })) });
+  ld.push({ '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: t.faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) });
+}
+if (view === 'product' && product) {
+  ld.push({ '@context': 'https://schema.org', '@type': 'Product', name: `${product.brand} ${product.name}`, brand: { '@type': 'Brand', name: product.brand }, description: product.description, url: abs(productUrl(product)), category: t?.name });
+}
+if ((view === 'type' || view === 'collection') && list.length) {
+  ld.push({ '@context': 'https://schema.org', '@type': 'ItemList', itemListElement: list.map((p, i) => ({ '@type': 'ListItem', position: i + 1, url: abs(productUrl(p)), name: `${p.brand} ${p.name}` })) });
+}
+const sameType = view === 'product' && product ? products.filter((p) => typeOfProduct(p.type) === typeKey && p.slug !== product!.slug).slice(0, 6) : [];
+const fitsCuts = view === 'product' ? HAIRCUTS.filter((h) => h[1] === typeKey) : [];
+const quizData = view === 'podbor' ? products.map((p) => ({ s: p.slug, b: p.brand, n: p.name, t: typeOfProduct(p.type), r: p.branch, h: p.hold, sh: p.shine, ht: p.hair_types, l: p.lengths, bl: p.beard_lengths, sk: p.skin_types, raw: p.type })) : [];
+const typeNames = Object.fromEntries(Object.entries(TYPES).map(([k, v]) => [k, { n: v.name, u: typeUrl(k) }]));
+const typesOf = (b: string) => Object.entries(TYPES).filter(([, v]) => v.branch === b);
+---
+<Base {title} {description} jsonLd={ld}>
+  <div class="wrap kos">
+    <Crumbs items={crumbs} />
+
+    {view === 'hub' && (
+      <>
+        <h1>{h1}</h1>
+        <p class="lead">Средство подбирают не по бренду, а по длине и типу волос, стрижке и нужному эффекту. Ответьте на 4 вопроса — подскажем тип средства и позиции из каталога. Или выберите раздел ниже.</p>
+        <p><a class="btn brass" href="/kosmetika/podbor/">Подобрать средство за 4 вопроса</a></p>
+        <div class="grid br">
+          {Object.entries(BRANCHES).map(([k, b]) => (
+            <a class="panel br-i" href={`/kosmetika/${k}/`}>
+              <p class="eyebrow">{b.name}</p>
+              <h2>{b.h1}</h2>
+              <p class="muted">{typesOf(k).map(([, v]) => v.name).join(' · ')}</p>
+            </a>
+          ))}
+        </div>
+        <h2>Что выбрать: сравнения</h2>
+        <div class="chips">{Object.entries(COMPARISONS).map(([k, c]) => <a class="chip" href={`/kosmetika/${k}/`}>{c.h1}</a>)}</div>
+        <h2>Подборки под задачу</h2>
+        <div class="chips">{Object.entries(COLLECTIONS).map(([k, c]) => <a class="chip" href={`/kosmetika/podborki/${k}/`}>{c.name}</a>)}</div>
+        <h2>Какое средство под какую стрижку</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Стрижка</th><th>Основное средство</th><th>Дополнительно</th><th>Как укладывать</th></tr></thead>
+          <tbody>{HAIRCUTS.map(([c, k, add, how]) => <tr><td>{c}</td><td><a href={typeUrl(k)}>{TYPES[k].name}</a></td><td>{add}</td><td>{how}</td></tr>)}</tbody>
+        </table></div>
+        <div class="panel buy">
+          <h2>Где купить</h2>
+          <p>Многие барбершопы продают средства, которыми пользуются сами мастера, — там можно попросить совет и попробовать средство на своих волосах. <a href="/kosmetika/gde-kupit/">Барбершопы с косметикой по городам →</a></p>
+        </div>
+        <p class="muted small">В каталоге {products.length} средств. Характеристики взяты из описаний производителей и магазинов, ссылка на источник — в карточке каждого средства. TOP BARBERSHOP не продаёт косметику.</p>
+      </>
+    )}
+
+    {view === 'branch' && (
+      <>
+        <h1>{h1}</h1>
+        <p class="lead">{BRANCHES[branchKey].lead}</p>
+        <p><a class="btn brass sm" href="/kosmetika/podbor/">Подобрать средство за 4 вопроса</a></p>
+        <div class="grid tps">
+          {typesOf(branchKey).map(([k, v]) => (
+            <a class="panel tp" href={typeUrl(k)}><h2>{v.name}</h2><p class="muted">{v.intro.split('. ')[0]}.</p><span class="muted small">{byType(v.productTypes).length || 'нет'} в каталоге</span></a>
+          ))}
+        </div>
+        {branchKey === 'volosy' && (
+          <>
+            <h2>Сравнение средств для укладки</h2>
+            <div class="tbl"><table>
+              <thead><tr><th>Средство</th><th>Фиксация</th><th>Блеск</th><th>Смывается</th><th>Волосы</th><th>Длина сверху</th></tr></thead>
+              <tbody>
+                <tr><td><a href={typeUrl('glina')}>Глина</a></td><td>сильная</td><td>матовый</td><td>шампунем</td><td>тонкие, нормальные, жирнеющие</td><td>3–10 см</td></tr>
+                <tr><td><a href={typeUrl('pasta')}>Паста</a></td><td>средняя</td><td>матовый, полуматовый</td><td>шампунем</td><td>почти любые</td><td>2–8 см</td></tr>
+                <tr><td><a href={typeUrl('pomada')}>Помада на водной основе</a></td><td>средняя–сильная</td><td>средний–сильный</td><td>водой</td><td>нормальные, густые</td><td>5–15 см</td></tr>
+                <tr><td><a href={typeUrl('pomada')}>Помада на масляной основе</a></td><td>сильная</td><td>сильный</td><td>с трудом</td><td>густые, жёсткие</td><td>5–15 см</td></tr>
+                <tr><td><a href={typeUrl('vosk')}>Воск</a></td><td>средняя</td><td>натуральный</td><td>шампунем</td><td>нормальные, густые</td><td>2–7 см</td></tr>
+                <tr><td><a href={typeUrl('gel')}>Гель</a></td><td>сильная</td><td>мокрый</td><td>водой</td><td>любые</td><td>2–15 см</td></tr>
+                <tr><td><a href={typeUrl('pudra')}>Пудра</a></td><td>лёгкая–средняя</td><td>матовый</td><td>шампунем</td><td>тонкие, прямые</td><td>от 4 см</td></tr>
+                <tr><td><a href={typeUrl('sprej-s-morskoj-solyu')}>Спрей с морской солью</a></td><td>лёгкая</td><td>матовый</td><td>водой</td><td>нормальные, тонкие, волнистые</td><td>от 5 см</td></tr>
+                <tr><td><a href={typeUrl('krem')}>Крем</a></td><td>лёгкая</td><td>натуральный</td><td>водой</td><td>густые, кудрявые, сухие</td><td>от 7 см</td></tr>
+              </tbody>
+            </table></div>
+            <h2>Подбор по типу волос</h2>
+            <div class="tbl"><table>
+              <thead><tr><th>Тип волос</th><th>Подходит</th><th>Не подходит</th><th>Почему</th></tr></thead>
+              <tbody>
+                <tr><td>Тонкие, редкие</td><td>пудра, глина, соль, тоник</td><td>масляная помада, воск, крем</td><td>тяжёлые средства прижимают волосы</td></tr>
+                <tr><td>Густые, жёсткие</td><td>помада, воск, глина сильной фиксации</td><td>пудра, соль</td><td>лёгкие средства не удержат форму</td></tr>
+                <tr><td>Кудрявые, волнистые</td><td>крем, гель для кудрей</td><td>пудра, частая соль</td><td>сухие средства дают пушение</td></tr>
+                <tr><td>Быстро жирнеют</td><td>глина, пудра, водная помада</td><td>масляная помада, крем</td><td>глина и пудра впитывают жир</td></tr>
+                <tr><td>Сухие, пушатся</td><td>крем, водная помада</td><td>гель со спиртом, соль, пудра</td><td>спирт и соль пересушивают</td></tr>
+              </tbody>
+            </table></div>
+            <p>Если не знаете, с чего начать, берите <a href={typeUrl('pasta')}>матовую пасту</a> средней фиксации: она прощает ошибки в количестве и подходит к большинству коротких стрижек.</p>
+          </>
+        )}
+        {branchKey === 'boroda' && (
+          <>
+            <h2>Подбор по длине бороды</h2>
+            <div class="tbl"><table>
+              <thead><tr><th>Длина</th><th>База</th><th>Добавить</th><th>Инструмент</th></tr></thead>
+              <tbody>
+                <tr><td>Щетина и первые 4 недели</td><td><a href={typeUrl('maslo')}>масло</a>, 2–3 капли</td><td>мягкое умывание</td><td>триммер</td></tr>
+                <tr><td>1–3 см</td><td>масло, 3–5 капель</td><td>лёгкий <a href={typeUrl('balzam')}>бальзам</a>, шампунь для бороды</td><td>щётка с натуральной щетиной</td></tr>
+                <tr><td>3–7 см</td><td>бальзам</td><td>масло, шампунь и кондиционер</td><td>щётка и расчёска</td></tr>
+                <tr><td>От 7 см</td><td><a href={typeUrl('shampun-borody')}>шампунь и кондиционер</a>, бальзам</td><td><a href={typeUrl('vosk-dlya-borody')}>воск</a> для формы, масло</td><td>расчёска с редкими зубьями, фен</td></tr>
+                <tr><td>Усы с закруткой</td><td>воск для усов</td><td>бальзам</td><td>расчёска для усов</td></tr>
+              </tbody>
+            </table></div>
+            <p>Порядок ухода: умыть или вымыть шампунем → промокнуть → масло → расчесать → бальзам или воск. Шампунь для бороды — 2–3 раза в неделю.</p>
+            <p>Масло не ускоряет рост бороды: оно ухаживает за кожей и волосом. Вопросы о редкой бороде — к врачу-трихологу.</p>
+          </>
+        )}
+        {branchKey === 'britie' && (
+          <>
+            <h2>Подбор по типу кожи</h2>
+            <div class="tbl"><table>
+              <thead><tr><th>Кожа</th><th>До бритья</th><th>Бритьё</th><th>После</th></tr></thead>
+              <tbody>
+                <tr><td>Сухая</td><td>масло или крем до бритья</td><td>крем для бритья</td><td>бальзам без спирта</td></tr>
+                <tr><td>Чувствительная</td><td>крем до бритья</td><td>крем для чувствительной кожи</td><td>бальзам без спирта и отдушек</td></tr>
+                <tr><td>Нормальная</td><td>по желанию</td><td>крем, мыло с помазком, гель</td><td>бальзам или лосьон</td></tr>
+                <tr><td>Жирная</td><td>—</td><td>мыло или гель</td><td>лосьон</td></tr>
+              </tbody>
+            </table></div>
+            <p>Для оформления контуров бороды нужен прозрачный гель или масло: сквозь них видна линия. При раздражении помогает техника: брить по росту волос острым лезвием и не проходить по одному месту много раз.</p>
+          </>
+        )}
+        {(() => { const l = products.filter((p) => p.branch === branchKey); return l.length > 0 && (<><h2>Средства в каталоге</h2><div class="grid pr">{l.map((p) => <a class="panel pr-i" href={productUrl(p)}><span class="eyebrow">{TYPES[typeOfProduct(p.type)]?.name}</span><b>{p.brand} {p.name}</b><span class="muted small">{specLine(p)}</span></a>)}</div></>); })()}
+      </>
+    )}
+
+    {view === 'type' && t && (
+      <>
+        <p class="eyebrow">{BRANCHES[t.branch].name}</p>
+        <h1>{h1}</h1>
+        <p class="lead">{t.intro}</p>
+        <div class="cols">
+          <div class="panel"><h2 class="h3">Кому подходит</h2><ul>{t.fits.map((x) => <li>{x}</li>)}</ul>{t.avoid && <p class="muted">{t.avoid}</p>}</div>
+          <div class="panel"><h2 class="h3">Как пользоваться</h2><ol>{t.howto.map((x) => <li>{x}</li>)}</ol></div>
+        </div>
+        <h2>Частые ошибки</h2>
+        <ul>{t.mistakes.map((x) => <li>{x}</li>)}</ul>
+        <h2>{t.name}: средства в каталоге</h2>
+        {list.length === 0 ? <p class="muted">Позиции этого типа редакция ещё добавляет.</p> : (
+          <div class="tbl"><table>
+            <thead><tr><th>Средство</th>{t.branch === 'volosy' && <><th>Фиксация</th><th>Блеск</th><th>Волосы</th></>}{t.branch === 'boroda' && <th>Длина бороды</th>}{t.branch === 'britie' && <th>Кожа</th>}<th>Объём</th></tr></thead>
+            <tbody>{list.map((p) => (
+              <tr>
+                <td><a href={productUrl(p)}>{p.brand} {p.name}</a></td>
+                {t.branch === 'volosy' && <><td class="dots" title={p.hold ? LABEL.hold[p.hold] : 'не указана'}>{holdBar(p.hold)}</td><td>{p.shine ? LABEL.shine[p.shine] : '—'}</td><td>{p.hair_types.map((h) => LABEL.hair[h]).join(', ') || '—'}</td></>}
+                {t.branch === 'boroda' && <td>{p.beard_lengths.map((h) => LABEL.beard[h]).join(', ') || '—'}</td>}
+                {t.branch === 'britie' && <td>{p.skin_types.map((h) => LABEL.skin[h]).join(', ') || '—'}</td>}
+                <td>{p.size || '—'}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+        <h2>Вопросы и ответы</h2>
+        <dl class="faq">{t.faq.map(([q, a]) => <><dt>{q}</dt><dd>{a}</dd></>)}</dl>
+        <p class="chips">
+          {Object.entries(COMPARISONS).filter(([, c]) => c.a === typeKey || c.b === typeKey).map(([k, c]) => <a class="chip" href={`/kosmetika/${k}/`}>{c.h1}</a>)}
+          <a class="chip" href="/kosmetika/podbor/">Подобрать средство</a>
+          <a class="chip" href={`/kosmetika/${t.branch}/`}>Все средства: {BRANCHES[t.branch].name.toLowerCase()}</a>
+        </p>
+      </>
+    )}
+
+    {view === 'product' && product && (
+      <>
+        <p class="eyebrow">{t?.name}</p>
+        <h1>{h1}</h1>
+        <div class="cols">
+          <div>
+            <p class="lead">{product.description}</p>
+            {t && <><h2 class="h3">Как пользоваться</h2><ol>{t.howto.map((x) => <li>{x}</li>)}</ol></>}
+            {fitsCuts.length > 0 && <><h2 class="h3">Подходит для стрижек</h2><p class="chips">{fitsCuts.map((h) => <span class="chip">{h[0]}</span>)}</p></>}
+          </div>
+          <aside class="panel">
+            <dl class="spec">
+              <dt>Бренд</dt><dd>{product.brand}</dd>
+              <dt>Тип</dt><dd>{t ? <a href={typeUrl(typeKey)}>{t.name}</a> : product.type}</dd>
+              {product.hold && <><dt>Фиксация</dt><dd><span class="dots">{holdBar(product.hold)}</span> {LABEL.hold[product.hold]}</dd></>}
+              {product.shine && <><dt>Блеск</dt><dd>{LABEL.shine[product.shine]}</dd></>}
+              {product.base && <><dt>Основа</dt><dd>{LABEL.base[product.base]}</dd></>}
+              {product.wash && <><dt>Смывается</dt><dd>{LABEL.wash[product.wash]}</dd></>}
+              {product.hair_types.length > 0 && <><dt>Волосы</dt><dd>{product.hair_types.map((h) => LABEL.hair[h]).join(', ')}</dd></>}
+              {product.lengths.length > 0 && <><dt>Длина сверху</dt><dd>{product.lengths.map((h) => LABEL.len[h]).join(', ')}</dd></>}
+              {product.beard_lengths.length > 0 && <><dt>Длина бороды</dt><dd>{product.beard_lengths.map((h) => LABEL.beard[h]).join(', ')}</dd></>}
+              {product.skin_types.length > 0 && <><dt>Кожа</dt><dd>{product.skin_types.map((h) => LABEL.skin[h]).join(', ')}</dd></>}
+              {product.size && <><dt>Объём</dt><dd>{product.size}</dd></>}
+            </dl>
+            <a class="btn brass sm wide" href="/kosmetika/gde-kupit/">Где купить в барбершопах</a>
+            {product.source_url && <p class="muted small">Характеристики: <a href={product.source_url} rel="nofollow noopener" target="_blank">источник</a>. Проверяйте состав и объём на упаковке.</p>}
+          </aside>
+        </div>
+        {sameType.length > 0 && (<><h2>Другие средства этого типа</h2><div class="grid pr">{sameType.map((p) => <a class="panel pr-i" href={productUrl(p)}><b>{p.brand} {p.name}</b><span class="muted small">{specLine(p)}</span></a>)}</div></>)}
+      </>
+    )}
+
+    {view === 'compare' && (() => { const c = COMPARISONS[cmpKey]; return (
+      <>
+        <h1>{h1}</h1>
+        <p class="lead">{c.verdict}</p>
+        <div class="tbl"><table>
+          <thead><tr><th></th><th><a href={typeUrl(c.a)}>{TYPES[c.a].name}</a></th><th><a href={typeUrl(c.b)}>{TYPES[c.b].name}</a></th></tr></thead>
+          <tbody>{c.rows.map(([k, a, b]) => <tr><td>{k}</td><td>{a}</td><td>{b}</td></tr>)}</tbody>
+        </table></div>
+        <div class="cols">
+          {[c.a, c.b].map((k) => <div class="panel"><h2 class="h3"><a href={typeUrl(k)}>{TYPES[k].name}</a></h2><ul class="plain">{byType(TYPES[k].productTypes).slice(0, 6).map((p) => <li><a href={productUrl(p)}>{p.brand} {p.name}</a></li>)}</ul></div>)}
+        </div>
+        <p><a class="btn brass sm" href="/kosmetika/podbor/">Не уверены? Подберите за 4 вопроса</a></p>
+      </>
+    ); })()}
+
+    {view === 'collections' && (
+      <>
+        <h1>{h1}</h1>
+        <p class="lead">Готовые наборы под задачу — для тех, кто не хочет разбираться в типах средств.</p>
+        <div class="grid tps">
+          {Object.entries(COLLECTIONS).map(([k, c]) => <a class="panel tp" href={`/kosmetika/podborki/${k}/`}><h2>{c.name}</h2><p class="muted">{c.who}</p><span class="muted small">{products.filter(c.pick).length} средств</span></a>)}
+        </div>
+      </>
+    )}
+
+    {view === 'collection' && (() => { const c = COLLECTIONS[colKey]; return (
+      <>
+        <p class="eyebrow">Подборка · {c.who}</p>
+        <h1>{h1}</h1>
+        <p class="lead">{c.intro}</p>
+        <p class="chips">{c.types.filter((k) => TYPES[k]).map((k) => <a class="chip" href={typeUrl(k)}>{TYPES[k].name}: как выбрать</a>)}</p>
+        <div class="grid pr">{list.map((p) => <a class="panel pr-i" href={productUrl(p)}><span class="eyebrow">{TYPES[typeOfProduct(p.type)]?.name}</span><b>{p.brand} {p.name}</b><span class="muted small">{p.description.split('. ')[0]}.</span></a>)}</div>
+        <p class="chips" style="margin-top:20px">{Object.entries(COLLECTIONS).filter(([k]) => k !== colKey).map(([k, x]) => <a class="chip" href={`/kosmetika/podborki/${k}/`}>{x.name}</a>)}</p>
+      </>
+    ); })()}
+
+    {view === 'cities' && (
+      <>
+        <h1>{h1}</h1>
+        <p class="lead">Многие барбершопы продают средства, которыми работают мастера. В барбершопе можно спросить совет и попробовать средство на своих волосах. Список — по отметке «Продаём косметику» в карточках каталога.</p>
+        <div class="chips">{cities.map((c) => <a class="chip" href={`/kosmetika/gde-kupit/${c.path}/`}>{c.name} <span class="muted">{c.n}</span></a>)}</div>
+      </>
+    )}
+
+    {view === 'city' && (
+      <>
+        <h1>{h1}</h1>
+        <p class="lead">{shopsWord(cityData.total)} {inCity(city.name)} отмечают, что продают косметику. Ассортимент уточняйте по телефону или при записи.</p>
+        <div class="grid">{cityData.items.map((s: any) => <ShopCard s={s} />)}</div>
+        <Pager base={`/kosmetika/gde-kupit/${city.path}/`} {page} pages={cityData.pages} />
+        <p><a href="/kosmetika/podbor/">Сначала подберите средство →</a></p>
+      </>
+    )}
+
+    {view === 'podbor' && (
+      <>
+        <h1>{h1}</h1>
+        <p class="lead">4 вопроса — и вы получите тип средства, объяснение и подходящие позиции из каталога.</p>
+        <form id="quiz" class="panel quiz" onsubmit="return false">
+          <fieldset><legend>1. Что подбираем?</legend>
+            <label><input type="radio" name="what" value="volosy" checked /> Укладка волос</label>
+            <label><input type="radio" name="what" value="boroda" /> Борода и усы</label>
+            <label><input type="radio" name="what" value="britie" /> Бритьё</label>
+          </fieldset>
+          <div data-for="volosy">
+            <fieldset><legend>2. Какие у вас волосы?</legend>
+              <label><input type="radio" name="hair" value="fine" /> Тонкие, не хватает объёма</label>
+              <label><input type="radio" name="hair" value="normal" checked /> Обычные</label>
+              <label><input type="radio" name="hair" value="thick" /> Густые, жёсткие</label>
+              <label><input type="radio" name="hair" value="curly" /> Кудрявые или волнистые</label>
+            </fieldset>
+            <fieldset><legend>3. Длина сверху</legend>
+              <label><input type="radio" name="len" value="0-2" /> До 2 см</label>
+              <label><input type="radio" name="len" value="2-8" checked /> 2–8 см</label>
+              <label><input type="radio" name="len" value="8-15" /> 8–15 см</label>
+              <label><input type="radio" name="len" value="15+" /> Длиннее 15 см</label>
+            </fieldset>
+            <fieldset><legend>4. Какой результат нужен?</legend>
+              <label><input type="radio" name="fx" value="matte" checked /> Естественно, без блеска</label>
+              <label><input type="radio" name="fx" value="shine" /> Гладко, с блеском — классика</label>
+              <label><input type="radio" name="fx" value="volume" /> Объём</label>
+              <label><input type="radio" name="fx" value="wave" /> Лёгкая волна, свободно</label>
+            </fieldset>
+          </div>
+          <div data-for="boroda" hidden>
+            <fieldset><legend>2. Длина бороды</legend>
+              <label><input type="radio" name="beard" value="0-1" checked /> Щетина или только начал отращивать</label>
+              <label><input type="radio" name="beard" value="1-3" /> 1–3 см</label>
+              <label><input type="radio" name="beard" value="3-7" /> 3–7 см</label>
+              <label><input type="radio" name="beard" value="7+" /> От 7 см</label>
+            </fieldset>
+            <fieldset><legend>3. Что беспокоит?</legend>
+              <label><input type="radio" name="task" value="itch" checked /> Зуд, сухость, колючесть</label>
+              <label><input type="radio" name="task" value="shape" /> Не держит форму, торчат волоски</label>
+              <label><input type="radio" name="task" value="clean" /> Как правильно мыть</label>
+              <label><input type="radio" name="task" value="moustache" /> Усы с закруткой</label>
+            </fieldset>
+          </div>
+          <div data-for="britie" hidden>
+            <fieldset><legend>2. Какая у вас кожа?</legend>
+              <label><input type="radio" name="skin" value="sensitive" checked /> Чувствительная, бывает раздражение</label>
+              <label><input type="radio" name="skin" value="dry" /> Сухая</label>
+              <label><input type="radio" name="skin" value="normal" /> Нормальная</label>
+              <label><input type="radio" name="skin" value="oily" /> Жирная</label>
+            </fieldset>
+          </div>
+          <div id="res" class="res" aria-live="polite"></div>
+        </form>
+        <script is:inline define:vars={{ quizData, typeNames }}>
+          (function () {
+            var f = document.getElementById('quiz'), res = document.getElementById('res');
+            var val = function (n) { var e = f.querySelector('input[name="' + n + '"]:checked'); return e ? e.value : ''; };
+            function rec() {
+              var w = val('what'), types = [], why = '';
+              if (w === 'volosy') {
+                var h = val('hair'), l = val('len'), fx = val('fx');
+                if (l === '0-2') { types = ['pasta']; why = 'На такой длине средство почти не нужно: достаточно капли пасты, чтобы волосы легли аккуратно.'; }
+                else if (h === 'curly') { types = l === '2-8' ? ['krem', 'glina'] : ['krem']; why = 'Кудрям нужны влага и контроль пушения — крем. Пудра и частая соль добавят пушения.'; }
+                else if (fx === 'shine') { types = ['pomada', 'tonik']; why = h === 'fine' ? 'Для блеска нужна помада — для тонких волос только на водной основе и понемногу, объём даст тоник под фен.' : 'Гладкую классику с блеском держит помада; водная смывается водой, масляная — для густых волос.'; }
+                else if (fx === 'volume') { types = h === 'thick' ? ['tonik', 'glina'] : ['pudra', 'glina']; why = 'Объём дают сухие и матовые средства: пудра или тоник под фен у корней, глина — для фиксации.'; }
+                else if (fx === 'wave' || l === '15+') { types = ['sprej-s-morskoj-solyu', 'krem']; why = 'Для свободной волны — спрей с морской солью на влажные волосы, для контроля длины — крем.'; }
+                else { types = h === 'fine' ? ['glina', 'pudra'] : (l === '8-15' ? ['glina', 'pasta'] : ['pasta', 'glina']); why = h === 'fine' ? 'Тонким волосам подходит глина: держит сильно, даёт объём и не утяжеляет.' : 'Естественный матовый вид дают паста (гибко) и глина (сильнее, больше объёма).'; }
+                var pick = quizData.filter(function (p) { return types.indexOf(p.t) >= 0 && (p.ht.length === 0 || p.ht.indexOf(h) >= 0) && (fx !== 'shine' || h !== 'fine' || p.raw !== 'pomada' || p.sh); });
+                if (h === 'fine') pick = pick.filter(function (p) { return !(p.t === 'pomada' && p.h >= 5); });
+                return { types: types, why: why, pick: pick };
+              }
+              if (w === 'boroda') {
+                var b = val('beard'), task = val('task');
+                if (task === 'moustache') { types = ['vosk-dlya-borody']; why = 'Закрученные кончики держит только воск для усов.'; }
+                else if (task === 'clean') { types = ['shampun-borody', 'maslo']; why = 'Мойте бороду шампунем для бороды 2–3 раза в неделю, после — масло на кожу.'; }
+                else if (task === 'shape' && b !== '0-1') { types = b === '7+' ? ['balzam', 'vosk-dlya-borody'] : ['balzam']; why = 'Форму держит бальзам; на длинной бороде — воск.'; }
+                else { types = ['maslo']; why = 'Зуд и колючесть снимает масло: 2–8 капель в кожу и бороду каждый день.'; }
+                return { types: types, why: why, pick: quizData.filter(function (p) { return types.indexOf(p.t) >= 0 && (task === 'moustache' || p.bl.length === 0 || p.bl.indexOf(b) >= 0); }) };
+              }
+              var s = val('skin');
+              types = s === 'oily' ? ['krem-dlya-britya', 'posle-britya'] : (s === 'normal' ? ['mylo-dlya-britya', 'krem-dlya-britya', 'posle-britya'] : ['do-britya', 'krem-dlya-britya', 'posle-britya']);
+              why = s === 'oily' ? 'Жирной коже подойдут крем или гель для бритья и освежающий лосьон после.' : s === 'normal' ? 'Нормальной коже подходит любое средство; классика — мыло с помазком и бальзам после.' : 'Сухой и чувствительной коже — средство до бритья, крем вместо пены и бальзам без спирта после.';
+              return { types: types, why: why, pick: quizData.filter(function (p) { return types.indexOf(p.t) >= 0 && (p.sk.length === 0 || p.sk.indexOf(s) >= 0); }) };
+            }
+            function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+            function render() {
+              var w = val('what');
+              f.querySelectorAll('[data-for]').forEach(function (d) { d.hidden = d.getAttribute('data-for') !== w; });
+              var r = rec();
+              var t = r.types.filter(function (k) { return typeNames[k]; }).map(function (k) { return '<a class="chip" href="' + typeNames[k].u + '">' + esc(typeNames[k].n) + '</a>'; }).join(' ');
+              var items = r.pick.slice(0, 8).map(function (p) { return '<li><a href="/kosmetika/p/' + p.s + '/">' + esc(p.b + ' ' + p.n) + '</a> <span class="muted">— ' + esc(typeNames[p.t] ? typeNames[p.t].n.toLowerCase() : '') + '</span></li>'; }).join('');
+              res.innerHTML = '<h2>Вам подойдёт</h2><p class="chips">' + t + '</p><p>' + esc(r.why) + '</p>' + (items ? '<h3>Из каталога</h3><ul class="plain">' + items + '</ul>' : '');
+            }
+            f.addEventListener('change', render); render();
+          })();
+        </script>
+      </>
+    )}
+  </div>
+</Base>
+<style>
+.kos h1{margin-bottom:10px}.kos h2{margin-top:30px}.kos .panel h2,.kos .grid h2{margin-top:0}.lead{font-size:18px;max-width:820px}
+.small{font-size:14px}
+.br{margin:22px 0 10px}.br-i,.tp,.pr-i{text-decoration:none;color:inherit;display:grid;gap:6px;align-content:start}.br-i h2,.tp h2{margin:0;font-size:20px}
+.br-i:hover,.tp:hover,.pr-i:hover{border-color:var(--brass)}
+.tps{margin:18px 0}.pr{margin:14px 0}
+.tbl{overflow-x:auto;margin:10px 0 18px}.tbl table{width:100%;border-collapse:collapse;min-width:560px;font-size:15px}.tbl th,.tbl td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.tbl th{background:var(--paper)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:16px;margin:16px 0}.cols>*{min-width:0}
+.dots{color:var(--brass);letter-spacing:1px;white-space:nowrap}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0 0 14px}.spec dt{color:var(--muted)}.spec dd{margin:0}
+.wide{width:100%}
+.faq dt{font-weight:650;margin-top:10px}.faq dd{margin:4px 0 0}
+.buy{margin:24px 0}.buy h2{margin-top:0}
+ul.plain{padding-left:18px}
+.quiz fieldset{border:0;padding:0;margin:0 0 16px}.quiz legend{font-weight:700;margin-bottom:8px}
+.quiz label{display:flex;gap:8px;align-items:center;padding:6px 0;cursor:pointer}
+.res{border-top:1px solid var(--line);padding-top:12px}.res h2{margin:0 0 8px}
+</style>

@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { sql } from '../lib/db';
+import { BRANCHES, TYPES, COMPARISONS, COLLECTIONS, typeUrl } from '../lib/cosmetics';
 const SITE = 'https://top-barbershop.com';
 export const GET: APIRoute = async () => {
   const [shops, locs, metros, chains, colls, posts, pages, scities, vcities, cats, schools, vacs] = await Promise.all([
@@ -16,6 +17,10 @@ export const GET: APIRoute = async () => {
     sql`select slug from schools where status='published'`,
     sql`select slug from vacancies where status='published'`,
   ]);
+  const [prods, kcities] = await Promise.all([
+    sql`select slug, updated_at from products where status='published'`,
+    sql`select distinct l.path from barbershops b join locations l on l.id=b.location_id where b.status='published' and not coalesce(b.closed,false) and b.amenities ? 'cosmet' and l.path like 'russia/%'`,
+  ]);
   const u: [string, any?][] = [['/'], ['/listings/'], ['/goroda/'], ['/samye-krupnye-seti-barbershopov/'], ['/zhurnal/'], ['/school/'], ['/vacancy/'], ['/add/'], ['/tarify/'], ['/oferta/']];
   scities.forEach((x) => u.push([`/school/school-city/${x.slug}/`]));
   vcities.forEach((x) => u.push([`/vacancy/vacancy-city/${x.slug}/`]));
@@ -29,6 +34,13 @@ export const GET: APIRoute = async () => {
   cats.forEach((x) => u.push([`/category/${x.slug}/`]));
   schools.forEach((x) => u.push([`/school/${x.slug}/`]));
   vacs.forEach((x) => u.push([`/vacancy/${x.slug}/`]));
+  u.push(['/kosmetika/'], ['/kosmetika/podbor/'], ['/kosmetika/podborki/'], ['/kosmetika/gde-kupit/']);
+  Object.keys(BRANCHES).forEach((k) => u.push([`/kosmetika/${k}/`]));
+  Object.keys(TYPES).forEach((k) => u.push([typeUrl(k)]));
+  Object.keys(COMPARISONS).forEach((k) => u.push([`/kosmetika/${k}/`]));
+  Object.keys(COLLECTIONS).forEach((k) => u.push([`/kosmetika/podborki/${k}/`]));
+  prods.forEach((x) => u.push([`/kosmetika/p/${x.slug}/`, x.updated_at]));
+  kcities.forEach((x) => u.push([`/kosmetika/gde-kupit/${x.path}/`]));
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${u
     .map(([p, d]) => `<url><loc>${esc(SITE + encodeURI(p))}</loc>${d ? `<lastmod>${new Date(d).toISOString().slice(0, 10)}</lastmod>` : ''}</url>`)
