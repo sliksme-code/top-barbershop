@@ -41,7 +41,8 @@ a.chip:hover{border-color:var(--ink)}
 .crumbs{font-size:14px;color:var(--muted);margin:18px 0 10px;display:flex;flex-wrap:wrap;gap:6px}
 .crumbs a{text-decoration:none}.crumbs a:hover{text-decoration:underline}
 .prose{font-size:17px;line-height:1.7;max-width:760px}
-.prose img{border-radius:10px;margin:18px 0}
+.prose img{border-radius:10px;margin:18px 0;max-width:100%;height:auto}
+.prose figure{margin:24px 0}.prose figure img{margin:0;width:100%;display:block}.prose figcaption{font-size:14px;line-height:1.45;color:var(--muted);margin-top:8px}
 .prose h2{margin-top:1.6em}.prose h3{margin-top:1.4em}
 .prose a{color:var(--red)}
 .prose iframe{max-width:100%}
