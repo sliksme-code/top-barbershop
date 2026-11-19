@@ -1,0 +1,36 @@
+name: fetch-media
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: 'Unsplash photo ids, space separated'
+        required: true
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download photos and license info
+        env:
+          IDS: ${{ inputs.ids }}
+        run: |
+          mkdir -p out && cd out
+          for id in $IDS; do
+            curl -sL -A "Mozilla/5.0" "https://unsplash.com/photos/$id" -o "$id.html" || true
+            plus=$(grep -c 'Unsplash+ License\|plus.unsplash.com' "$id.html" || true)
+            free=$(grep -c 'Free to use under the' "$id.html" || true)
+            author=$(grep -o '"name":"[^"]*","first_name"' "$id.html" | head -1 | sed 's/"name":"\([^"]*\)".*/\1/')
+            title=$(grep -o '<title>[^<]*' "$id.html" | head -1 | sed 's/<title>//')
+            curl -sL -A "Mozilla/5.0" "https://unsplash.com/photos/$id/download?force=true&w=1600" -o "$id.jpg" || true
+            echo "$id|free=$free|plus=$plus|author=$author|title=$title|$(file -b "$id.jpg" | cut -c1-60)" >> info.txt
+            rm -f "$id.html"
+          done
+          cat info.txt
+      - name: Push to temp branch
+        run: |
+          cd out
+          git init -q && git checkout -q -b media-tmp
+          git config user.name bot && git config user.email bot@users.noreply.github.com
+          git add . && git commit -qm media
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" media-tmp
