@@ -11,20 +11,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download photos and license info
+      - name: Download photos
         env:
           IDS: ${{ inputs.ids }}
         run: |
           mkdir -p out && cd out
-          for id in $IDS; do
-            curl -sL -A "Mozilla/5.0" "https://unsplash.com/photos/$id" -o "$id.html" || true
-            plus=$(grep -c 'Unsplash+ License\|plus.unsplash.com' "$id.html" || true)
-            free=$(grep -c 'Free to use under the' "$id.html" || true)
-            author=$(grep -o '"name":"[^"]*","first_name"' "$id.html" | head -1 | sed 's/"name":"\([^"]*\)".*/\1/')
-            title=$(grep -o '<title>[^<]*' "$id.html" | head -1 | sed 's/<title>//')
-            curl -sL -A "Mozilla/5.0" "https://unsplash.com/photos/$id/download?force=true&w=1600" -o "$id.jpg" || true
-            echo "$id|free=$free|plus=$plus|author=$author|title=$title|$(file -b "$id.jpg" | cut -c1-60)" >> info.txt
-            rm -f "$id.html"
+          # формат: имя=https://images.unsplash.com/photo-...
+          for item in $IDS; do
+            n="${item%%=*}"; u="${item#*=}"
+            curl -sL -A "Mozilla/5.0" "$u" -o "$n.jpg" || true
+            echo "$n $(file -b "$n.jpg" | cut -c1-70)" >> info.txt
           done
           cat info.txt
       - name: Push to temp branch
