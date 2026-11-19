@@ -5,76 +5,121 @@ const cities = [
   ['/location/russia/kzn/', 'Казань'], ['/location/russia/ekb/', 'Екатеринбург'], ['/location/russia/nsk/', 'Новосибирск'],
   ['/location/ukraina/kiev/', 'Киев'],
 ];
+const pros = [['/school/', 'Школы барберов'], ['/vacancy/', 'Вакансии'], ['/tarify/', 'Тарифы для владельцев'], ['/add/', 'Добавить барбершоп']];
+const account = [['/my/', 'Мои барбершопы'], ['/stats/', 'Статистика'], ['/my-favorites/', 'Избранное'], ['/billing/', 'Тариф и продвижение'], ['/change-password/', 'Пароль']];
 const q = Astro.url.searchParams.get('q') ?? '';
 const user = Astro.locals.user;
+const path = Astro.url.pathname;
+const on = (...p: string[]) => (p.some((x) => path.startsWith(x)) ? 'on' : undefined);
 ---
 <header class="hdr">
   <div class="wrap hdr-in">
     <a href="/" class="hdr-logo" aria-label="TOP BARBERSHOP — на главную"><Logo /></a>
     <nav class="hdr-nav" aria-label="Главное меню">
       <details class="dd">
-        <summary>Города</summary>
-        <div class="dd-menu">
-          {cities.map(([h, l]) => <a href={h}>{l}</a>)}
-          <a href="/goroda/" class="all">Все города →</a>
+        <summary class={on('/listings/', '/location/', '/goroda/', '/samye-krupnye', '/all/', '/metro/', '/place/', '/collection/')}>Каталог</summary>
+        <div class="dd-menu dd-cat">
+          <div>
+            <p class="dd-h">Города</p>
+            {cities.map(([h, l]) => <a href={h}>{l}</a>)}
+            <a href="/goroda/" class="all">Все города →</a>
+          </div>
+          <div>
+            <p class="dd-h">Каталог</p>
+            <a href="/listings/">Все барбершопы</a>
+            <a href="/samye-krupnye-seti-barbershopov/">Сети барбершопов</a>
+          </div>
         </div>
       </details>
-      <a href="/listings/">Все барбершопы</a>
-      <a href="/samye-krupnye-seti-barbershopov/">Сети</a>
-      <a href="/kosmetika/">Косметика</a>
-      <a href="/zhurnal/">Журнал</a>
-      <a href="/school/">Школы</a>
-      <a href="/vacancy/">Вакансии</a>
+      <a href="/kosmetika/" class={on('/kosmetika/')}>Косметика</a>
+      <a href="/zhurnal/" class={on('/zhurnal/')}>Журнал</a>
+      <details class="dd">
+        <summary class={on('/school', '/vacancy', '/tarify/')}>Барберам</summary>
+        <div class="dd-menu">{pros.map(([h, l]) => <a href={h}>{l}</a>)}</div>
+      </details>
     </nav>
     <form action="/search/" method="get" class="hdr-search" role="search">
       <label class="sr" for="hq">Поиск барбершопа</label>
+      <svg class="hdr-sicon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
       <input id="hq" name="q" value={q} placeholder="Барбершоп, улица, метро" class="field" />
     </form>
-    <a href={user ? '/my/' : '/login/'} class="hdr-user">{user ? 'Кабинет' : 'Войти'}</a>
-    <a href="/add/" class="btn brass sm hdr-cta">Добавить барбершоп</a>
+    {user ? (
+      <details class="dd dd-r hdr-user">
+        <summary class={on('/my', '/stats/', '/billing', '/change-password/', '/edit')}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg><span>Кабинет</span>
+        </summary>
+        <div class="dd-menu">{account.map(([h, l]) => <a href={h}>{l}</a>)}<a href="/logout/" class="muted-l">Выйти</a></div>
+      </details>
+    ) : (
+      <a href="/login/" class="hdr-user">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 4-6 8-6s8 2 8 6" /></svg><span>Войти</span>
+      </a>
+    )}
+    <a href="/add/" class="btn brass sm hdr-cta"><span class="cta-l">Добавить барбершоп</span><span class="cta-s">Добавить</span></a>
     <details class="burger">
       <summary aria-label="Меню"><span></span><span></span><span></span></summary>
       <div class="burger-menu">
         <form action="/search/" method="get" role="search"><input name="q" value={q} placeholder="Поиск барбершопа" class="field" aria-label="Поиск барбершопа" /></form>
+        <p class="bm-h">Каталог</p>
         <a href="/listings/">Все барбершопы</a>
-        {cities.map(([h, l]) => <a href={h}>{l}</a>)}
-        <a href="/goroda/">Все города</a>
         <a href="/samye-krupnye-seti-barbershopov/">Сети барбершопов</a>
+        <a href="/goroda/">Все города</a>
+        <div class="bm-cities">{cities.map(([h, l]) => <a href={h}>{l}</a>)}</div>
         <a href="/kosmetika/">Косметика</a>
         <a href="/zhurnal/">Журнал</a>
-        <a href="/school/">Школы барберов</a>
-        <a href="/vacancy/">Вакансии</a>
-        <a href={user ? '/my/' : '/login/'}>{user ? 'Личный кабинет' : 'Войти'}</a>
+        <p class="bm-h">Барберам</p>
+        {pros.slice(0, 3).map(([h, l]) => <a href={h}>{l}</a>)}
+        <p class="bm-h">{user ? 'Кабинет' : 'Аккаунт'}</p>
+        {user ? <>{account.map(([h, l]) => <a href={h}>{l}</a>)}<a href="/logout/">Выйти</a></> : <a href="/login/">Войти</a>}
         <a href="/add/" class="btn brass">Добавить барбершоп</a>
       </div>
     </details>
   </div>
 </header>
+<script is:inline>
+  document.addEventListener('click', function (e) {
+    document.querySelectorAll('.hdr details[open]').forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute('open'); });
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') document.querySelectorAll('.hdr details[open]').forEach(function (d) { d.removeAttribute('open'); }); });
+  document.querySelectorAll('.hdr .dd').forEach(function (d) { d.addEventListener('toggle', function () { if (d.open) document.querySelectorAll('.hdr .dd[open]').forEach(function (o) { if (o !== d) o.removeAttribute('open'); }); }); });
+</script>
 <style>
 .hdr{background:var(--ink);color:#f3ede4;position:sticky;top:0;z-index:50;border-bottom:1px solid #2c2620}
-.hdr-in{display:flex;align-items:center;gap:22px;height:68px}
+.hdr-in{display:flex;align-items:center;gap:20px;height:68px}
 .hdr-logo{flex:none;text-decoration:none;color:#fff}
-.hdr-nav{display:flex;align-items:center;gap:20px;font-size:15px;font-weight:550}
+.hdr-nav{display:flex;align-items:center;gap:18px;font-size:15px;font-weight:550;flex:none}
 .hdr-nav>a,.dd summary{text-decoration:none;color:#e9e1d5;white-space:nowrap;cursor:pointer}
-.hdr-nav>a:hover,.dd summary:hover{color:var(--brass2)}
-.dd{position:relative}.dd summary{list-style:none}.dd summary::-webkit-details-marker{display:none}
-.dd summary::after{content:' ▾';font-size:11px}
-.dd-menu{position:absolute;top:36px;left:-14px;background:#fff;color:var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:8px;min-width:220px;display:grid}
-.dd-menu a{padding:8px 12px;border-radius:8px;text-decoration:none}.dd-menu a:hover{background:var(--paper)}
+.hdr-nav>a:hover,.dd summary:hover,.hdr-nav .on,.hdr-user .on{color:var(--brass2)}
+.dd{position:relative}.dd summary{list-style:none;display:flex;align-items:center;gap:6px}.dd summary::-webkit-details-marker{display:none}
+.hdr-nav .dd summary::after{content:'';width:6px;height:6px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px) rotate(45deg);opacity:.8}
+.dd[open] summary::after{transform:translateY(1px) rotate(-135deg)}
+.dd-menu{position:absolute;top:38px;left:-14px;background:#fff;color:var(--ink);border-radius:12px;box-shadow:var(--shadow);padding:8px;min-width:230px;display:grid;font-size:15px;font-weight:500}
+.dd-r .dd-menu{left:auto;right:-8px}
+.dd-cat{grid-template-columns:repeat(2,minmax(200px,1fr));gap:4px 8px;min-width:440px}
+.dd-h{margin:6px 12px 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650}
+.dd-menu a{display:block;padding:8px 12px;border-radius:8px;text-decoration:none;color:var(--ink)}.dd-menu a:hover{background:var(--paper)}
 .dd-menu .all{color:var(--red);font-weight:600}
-.hdr-search{flex:1;min-width:0;max-width:340px;margin-left:auto}
-.hdr-search .field{background:#221d18;border-color:#3a332b;color:#fff;padding:10px 16px}
+.dd-menu .muted-l{color:var(--muted);border-top:1px solid var(--line);border-radius:0 0 8px 8px;margin-top:4px}
+.hdr-search{flex:1 1 220px;min-width:150px;max-width:420px;margin-left:auto;position:relative}
+.hdr-sicon{position:absolute;left:13px;top:50%;width:17px;height:17px;transform:translateY(-50%);fill:none;stroke:#9b9184;stroke-width:2;stroke-linecap:round;pointer-events:none}
+.hdr-search .field{background:#221d18;border-color:#3a332b;color:#fff;padding:10px 14px 10px 38px;width:100%}
 .hdr-search .field::placeholder{color:#9b9184}
-.hdr-cta{flex:none}
-.hdr-user{color:#e9e1d5;text-decoration:none;font-weight:600;white-space:nowrap;flex:none}.hdr-user:hover{color:var(--brass2)}
+.hdr-user{flex:none;display:flex;align-items:center;gap:7px;color:#e9e1d5;text-decoration:none;font-weight:600;white-space:nowrap;font-size:15px}
+a.hdr-user:hover{color:var(--brass2)}
+.hdr-user svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;flex:none}
+.hdr-cta{flex:none;white-space:nowrap}.cta-s{display:none}
 .burger{display:none;margin-left:auto}
 .burger summary{list-style:none;cursor:pointer;width:44px;height:44px;display:grid;place-content:center;gap:5px}
 .burger summary::-webkit-details-marker{display:none}
 .burger summary span{display:block;width:24px;height:2px;background:#fff;border-radius:2px}
-.burger-menu{position:fixed;left:0;right:0;top:68px;bottom:0;background:var(--ink);padding:16px;display:grid;align-content:start;gap:4px;overflow:auto}
-.burger-menu a:not(.btn){color:#f3ede4;text-decoration:none;padding:12px 4px;border-bottom:1px solid #2c2620;font-size:17px}
-.burger-menu .btn{margin-top:14px}
-.burger-menu form{margin-bottom:8px}
-@media (max-width:1180px){.hdr-cta{display:none}}
-@media (max-width:980px){.hdr-nav,.hdr-search,.hdr-user{display:none}.burger{display:block}}
+.burger-menu{position:fixed;left:0;right:0;top:68px;bottom:0;background:var(--ink);padding:16px;display:grid;align-content:start;gap:2px;overflow:auto}
+.burger-menu a:not(.btn){color:#f3ede4;text-decoration:none;padding:11px 4px;border-bottom:1px solid #2c2620;font-size:17px}
+.bm-h{margin:16px 4px 2px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--brass2);font-weight:700}
+.bm-cities{display:flex;flex-wrap:wrap;gap:6px;padding:10px 0}
+.burger-menu .bm-cities a{border:1px solid #3a332b;border-radius:999px;padding:6px 12px;font-size:15px}
+.burger-menu .btn{margin-top:16px}
+.burger-menu form{margin-bottom:6px}
+@media (max-width:1240px){.cta-l{display:none}.cta-s{display:inline}.hdr-in{gap:16px}.hdr-nav{gap:15px}}
+@media (max-width:1060px){.hdr-user span{display:none}.hdr-search{min-width:140px}}
+@media (max-width:960px){.hdr-nav,.hdr-search,.hdr-user,.hdr-cta{display:none}.burger{display:block}}
 </style>
