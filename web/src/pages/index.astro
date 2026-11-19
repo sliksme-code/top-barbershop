@@ -18,7 +18,7 @@ const [top, locs, chains, colls, posts, [stat]] = await Promise.all([
 ]);
 const cities = locs.filter((l) => l.parent_id && l.n > 0).slice(0, 16);
 const jsonLd = [
-  { '@context': 'https://schema.org', '@type': 'WebSite', name: site.name, url: 'https://top-barbershop.com/', potentialAction: { '@type': 'SearchAction', target: 'https://top-barbershop.com/search/?q={q}', 'query-input': 'required name=q' } },
+  { '@context': 'https://schema.org', '@type': 'WebSite', name: site.name, alternateName: site.altName, url: 'https://top-barbershop.com/', potentialAction: { '@type': 'SearchAction', target: 'https://top-barbershop.com/search/?q={q}', 'query-input': 'required name=q' } },
   { '@context': 'https://schema.org', '@type': 'Organization', name: site.name, url: 'https://top-barbershop.com/', logo: 'https://top-barbershop.com/favicon.svg', sameAs: [site.social.vk] },
 ];
 ---

@@ -56,10 +56,14 @@ const metrikaId = site.metrikaId;
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogAbs} />
     <meta name="theme-color" content="#111111" />
-    <link rel="icon" href="/favicon.ico" sizes="any" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon-192.png" type="image/png" sizes="192x192" />
+    <link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96" />
+    <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48" />
     <link rel="icon" href="/favicon-120.png" type="image/png" sizes="120x120" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <slot name="head" />
     <link rel="alternate" type="application/rss+xml" title="TOP BARBERSHOP — Журнал" href="/feed/" />
     {ld.map((o) => <script type="application/ld+json" set:html={JSON.stringify(o)} />)}
