@@ -73,6 +73,9 @@ const metrikaId = site.metrikaId;
     <slot name="head" />
     <link rel="alternate" type="application/rss+xml" title="TOP BARBERSHOP — Журнал" href="/feed/" />
     {ld.map((o) => <script type="application/ld+json" set:html={JSON.stringify(o)} />)}
+    {isProduction && <Fragment set:html={`<!-- Yandex Autoplacement 20461555 -->
+<script src="https://yandex.ru/ads/system/context.js" async></script>
+<script data-page-id="20461555" src="https://yandex.ru/ads/system/ap-loader.js" async></script>`} />}
   </head>
   <body>
     <Header />
