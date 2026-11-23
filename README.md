@@ -6,8 +6,9 @@
 |---|---|
 | `web/` | Сайт на Astro, `Dockerfile` (сборка падает при ошибках SEO — `npm run check:html`) |
 | `deploy/Caddyfile`, `deploy/redirects.caddy` | HTTPS, 301/410 со старых URL, отдача `/media/` и `/logos/` по старым путям |
-| `directus/` | Расширения CMS (кабинет владельца, модерация, ЮKassa — этап 2) |
+| `directus/` | Расширения CMS (кабинет владельца, модерация — этап 2) |
 | `migration/` | Перенос данных из WordPress |
+| `web/src/lib/billing.ts`, `web/src/pages/api/tochka.ts` | Эквайринг Точка Банк: платёжные ссылки, вебхук (JWT RS256), чек 54-ФЗ |
 | `deploy/backup.sh` | Ежедневный бэкап БД и медиа в S3 |
 | `.github/workflows/deploy.yml` | Push в `main` → образ в GHCR → деплой на VPS по SSH |
 
@@ -18,6 +19,7 @@
 ## Секреты GitHub (Settings → Secrets and variables → Actions)
 - `VPS_HOST` = 136.234.232.234
 - `VPS_SSH_KEY` = приватный ключ деплоя (ed25519)
+- Эквайринг Точка Банк: `TOCHKA_JWT`, `TOCHKA_CLIENT_ID`, `TOCHKA_CUSTOMER_CODE`, `TOCHKA_MERCHANT_ID`, `TOCHKA_ORDER_SECRET` (после первого деплоя зарегистрировать вебхук: `cd web && node scripts/tochka-setup.mjs`)
 - Variables: `DEPLOY_ENABLED=true` (включает деплой), `SITE_DOMAIN` (сейчас `new.top-barbershop.com`), `SITE_ENV` (`staging` до переключения)
 
 ## Тестовый домен
