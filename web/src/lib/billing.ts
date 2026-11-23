@@ -77,60 +77,95 @@ export async function reservePriority(userId: number, shopId: number, locationId
   });
 }
 
-// ---- ЮKassa: включается, когда заданы YOOKASSA_SHOP_ID и YOOKASSA_SECRET ----
-const SHOP = process.env.YOOKASSA_SHOP_ID, SECRET = process.env.YOOKASSA_SECRET;
-export const paymentsEnabled = Boolean(SHOP && SECRET);
-const auth = () => 'Basic ' + Buffer.from(`${SHOP}:${SECRET}`).toString('base64');
+// ---- Эквайринг Точка Банк: включается, когда заданы TOCHKA_JWT и TOCHKA_CUSTOMER_CODE ----
+// Документация: https://developers.tochka.com/docs/tochka-api (платёжные ссылки, /uapi/acquiring/v1.0)
+const TK_JWT = process.env.TOCHKA_JWT, CUSTOMER = process.env.TOCHKA_CUSTOMER_CODE;
+export const paymentsEnabled = Boolean(TK_JWT && CUSTOMER);
+const API = (process.env.TOCHKA_API_BASE || 'https://enter.tochka.com/uapi').replace(/\/$/, '');
+const PAYMENT_MODES = (process.env.TOCHKA_PAYMENT_MODES || 'card,sbp,tinkoff').split(',').map((s) => s.trim()).filter(Boolean);
+const TAX_SYSTEM = process.env.TOCHKA_TAX_SYSTEM || 'usn_income_outcome'; // osn | usn_income | usn_income_outcome | esn | patent
+const VAT = process.env.TOCHKA_VAT || 'none'; // none | vat0 | vat5 | vat7 | vat10 | vat22 | vat105 | vat107 | vat110 | vat122
 
-const receipt = (email: string, description: string, amount: number) =>
-  process.env.YOOKASSA_RECEIPT !== '0'
-    ? { receipt: { customer: { email }, tax_system_code: Number(process.env.YOOKASSA_TAX_SYSTEM || 6), items: [{ description: description.slice(0, 128), quantity: '1.00', amount: { value: amount.toFixed(2), currency: 'RUB' }, vat_code: 1, payment_mode: 'full_payment', payment_subject: 'service' }] } }
-    : {};
+async function tk(path: string, method = 'GET', body?: unknown) {
+  const r = await fetch(`${API}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${TK_JWT}`, 'Content-Type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    signal: AbortSignal.timeout(15000),
+  });
+  const j: any = await r.json().catch(() => null);
+  if (!r.ok) { console.error('tochka', method, path, j?.code, j?.message, j?.Errors?.[0]?.message); return null; }
+  return j?.Data ?? j;
+}
+
+// merchantId: из env, иначе первая активная торговая точка (кэш на процесс)
+let merchantCache: string | null = null;
+async function merchantId() {
+  if (process.env.TOCHKA_MERCHANT_ID) return process.env.TOCHKA_MERCHANT_ID;
+  if (merchantCache) return merchantCache;
+  const j = await tk(`/acquiring/v1.0/retailers?customerCode=${CUSTOMER}`).catch(() => null);
+  const arr = j?.Retailer || [];
+  const active = arr.find((x: any) => x.isActive === true) || arr.find((x: any) => x.status === 'REG');
+  merchantCache = active?.merchantId || null;
+  return merchantCache;
+}
+
 export const SITE = 'https://top-barbershop.com';
 export const payUrl = (orderId: number) => `${SITE}/billing/pay/?order=${orderId}`;
 const returnUrl = (orderId: number) => `${SITE}/billing/?paid=${orderId}`;
+const failUrl = (orderId: number) => `${SITE}/billing/pay/?order=${orderId}&retry=1`;
 
-async function ykCreate(order: { id: number; amount: number }, description: string, email: string, type: 'embedded' | 'redirect') {
-  const r = await fetch('https://api.yookassa.ru/v3/payments', {
-    method: 'POST',
-    headers: { Authorization: auth(), 'Idempotence-Key': `order-${order.id}-${type}-${Date.now()}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      amount: { value: order.amount.toFixed(2), currency: 'RUB' },
-      capture: true,
-      confirmation: type === 'embedded' ? { type: 'embedded' } : { type: 'redirect', return_url: returnUrl(order.id) },
-      description: description.slice(0, 128),
-      metadata: { order_id: String(order.id) },
-      ...receipt(email, description, order.amount),
-    }),
-    signal: AbortSignal.timeout(15000),
-  });
-  const j: any = await r.json();
-  if (!r.ok) { console.error('yookassa', type, j?.code, j?.description); return null; }
-  await sql`update orders set payment_id = ${j.id} where id = ${order.id}`;
-  return j;
+/** Создаёт платёжную ссылку в Точке. С чеком 54-ФЗ (payments_with_receipt), если не отключено TOCHKA_RECEIPT=0. */
+async function tkCreate(order: { id: number; amount: number }, description: string, email: string) {
+  const purpose = description.slice(0, 140);
+  const data: any = {
+    customerCode: CUSTOMER,
+    amount: Number(order.amount).toFixed(2),
+    purpose,
+    redirectUrl: returnUrl(order.id),
+    failRedirectUrl: failUrl(order.id),
+    paymentMode: PAYMENT_MODES,
+    paymentLinkId: `order-${order.id}`,
+  };
+  const m = await merchantId();
+  if (m) data.merchantId = m;
+  let j: any = null;
+  if (process.env.TOCHKA_RECEIPT !== '0') {
+    j = await tk('/acquiring/v1.0/payments_with_receipt', 'POST', {
+      Data: {
+        ...data,
+        taxSystemCode: TAX_SYSTEM,
+        Client: { email },
+        Items: [{ name: purpose.slice(0, 128), amount: data.amount, quantity: 1, paymentMethod: 'full_payment', paymentObject: 'service', vatType: VAT }],
+      },
+    });
+  }
+  if (!j) j = await tk('/acquiring/v1.0/payments', 'POST', { Data: data }); // чек не приняли — оплата важнее, чек вышлем из кассы
+  if (!j?.paymentLink || !j?.operationId) return null;
+  await sql`update orders set payment_id = ${j.operationId} where id = ${order.id}`;
+  return j.paymentLink as string;
 }
 
-/** Ссылка на страницу оплаты ЮKassa (запасной вариант, если виджет не загрузился). */
-export async function startPayment(order: { id: number; amount: number }, description: string, email: string) {
-  if (!paymentsEnabled) return null;
-  const j = await ykCreate(order, description, email, 'redirect');
-  return (j?.confirmation?.confirmation_url as string) || null;
+/** Статус операции в Точке: CREATED / APPROVED / ON-REFUND / REFUNDED / EXPIRED. */
+async function tkStatus(operationId: string) {
+  const j = await tk(`/acquiring/v1.0/payments/${encodeURIComponent(operationId)}`);
+  const op = (j?.Operation || [])[0];
+  return op ? { status: op.status as string, link: op.paymentLink as string | undefined, linkId: op.paymentLinkId as string | undefined } : null;
 }
 
 /**
- * Платёж для виджета в кабинете. Если у заказа уже есть живой встроенный платёж — переиспользуем его токен,
- * иначе создаём новый. Возвращает { token } или { paid: true } или null.
+ * Ссылка на оплату заказа. Живую ссылку (CREATED) переиспользуем, оплаченный заказ → { paid: true },
+ * протухшую (EXPIRED/REFUNDED) — создаём заново. Иначе { url } или null при ошибке API.
  */
-export async function embeddedPayment(order: { id: number; amount: number; payment_id?: string | null }, description: string, email: string) {
+export async function startPayment(order: { id: number; amount: number; payment_id?: string | null }, description: string, email: string) {
   if (!paymentsEnabled) return null;
   if (order.payment_id) {
-    const r = await fetch(`https://api.yookassa.ru/v3/payments/${encodeURIComponent(order.payment_id)}`, { headers: { Authorization: auth() }, signal: AbortSignal.timeout(15000) }).catch(() => null);
-    const p: any = r?.ok ? await r.json() : null;
-    if (p?.status === 'succeeded' || p?.status === 'waiting_for_capture') { await syncPayment(p.id); return { paid: true }; }
-    if (p?.status === 'pending' && p.confirmation?.type === 'embedded' && p.confirmation.confirmation_token) return { token: p.confirmation.confirmation_token as string };
+    const op = await tkStatus(order.payment_id).catch(() => null);
+    if (op?.status === 'APPROVED') { await syncPayment(order.payment_id); return { paid: true }; }
+    if (op?.status === 'CREATED' && op.link) return { url: op.link };
   }
-  const j = await ykCreate(order, description, email, 'embedded');
-  return j?.confirmation?.confirmation_token ? { token: j.confirmation.confirmation_token as string } : null;
+  const url = await tkCreate(order, description, email);
+  return url ? { url } : null;
 }
 
 /** Человекочитаемое название заказа — для чека, страницы оплаты и писем. */
@@ -151,16 +186,17 @@ export async function loadOrder(id: number) {
 /** Бронь топа ещё действует? (неоплаченная сгорает через 48 часов) */
 export const priorityAlive = (o: any) => o.kind !== 'priority' || (o.slot_status === 'reserved' && Date.now() - new Date(o.slot_at).getTime() < 48 * 3600e3);
 
-/** Проверяем платёж запросом в ЮKassa (вебхуку на слово не верим) и отмечаем заказ оплаченным. */
+/** Проверяем платёж запросом в Точку (вебхуку на слово не верим) и отмечаем заказ оплаченным. */
 export async function syncPayment(paymentId: string) {
   if (!paymentsEnabled || !paymentId) return false;
-  const r = await fetch(`https://api.yookassa.ru/v3/payments/${encodeURIComponent(paymentId)}`, { headers: { Authorization: auth() }, signal: AbortSignal.timeout(15000) });
-  if (!r.ok) return false;
-  const p: any = await r.json();
-  const id = Number(p.metadata?.order_id);
+  const op = await tkStatus(paymentId);
+  if (!op) return false;
+  // Заказ находим по paymentLinkId (order-123); запасной вариант — по payment_id в orders
+  const id = Number(String(op.linkId || '').replace(/^order-/, '')) ||
+    (await sql`select id from orders where payment_id = ${paymentId}`)[0]?.id;
   if (!id) return false;
-  if (p.status === 'succeeded') await sql`update orders set status = 'paid', payment_id = ${p.id} where id = ${id} and status = 'pending'`;
-  // отменённый платёж (отказ банка, закрыли форму) заказ не отменяет — можно оплатить снова
+  if (op.status === 'APPROVED') await sql`update orders set status = 'paid', payment_id = ${paymentId} where id = ${id} and status = 'pending'`;
+  // EXPIRED / REFUNDED заказ не отменяют — можно оплатить снова
   return true;
 }
 
