@@ -1,37 +1,50 @@
-name: build-and-deploy
-
-on:
-  push:
-    branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  packages: write
-
-env:
-  IMAGE: ghcr.io/sliksme-code/top-barbershop-web
-
-jobs:
-  build:
+  deploy:
+    needs: build
     runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - name: Копируем конфигурацию на сервер
+        uses: appleboy/scp-action@v0.1.7
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "docker-compose.yml,deploy/"
+          target: /opt/top-barbershop
+      - name: Обновляем контейнеры
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          ADMIN_NOTIFY_EMAIL: ${{ secrets.ADMIN_NOTIFY_EMAIL }}
+          SMARTCAPTCHA_SERVER_KEY: ${{ secrets.SMARTCAPTCHA_SERVER_KEY }}
+          TOCHKA_JWT: ${{ secrets.TOCHKA_JWT }}
+          TOCHKA_CLIENT_ID: ${{ secrets.TOCHKA_CLIENT_ID }}
+          TOCHKA_CUSTOMER_CODE: ${{ secrets.TOCHKA_CUSTOMER_CODE }}
+          TOCHKA_MERCHANT_ID: ${{ secrets.TOCHKA_MERCHANT_ID }}
+          TOCHKA_ORDER_SECRET: ${{ secrets.TOCHKA_ORDER_SECRET }}
         with:
-          context: ./web
-          push: true
-          build-args: |
-            SITE_URL=https://top-barbershop.com
-            SITE_ENV=production
-          tags: |
-            ${{ env.IMAGE }}:latest
-            ${{ env.IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          envs: ENV_FILE,SMTP_PASSWORD,ADMIN_NOTIFY_EMAIL,SMARTCAPTCHA_SERVER_KEY,TOCHKA_JWT,TOCHKA_CLIENT_ID,TOCHKA_CUSTOMER_CODE,TOCHKA_MERCHANT_ID,TOCHKA_ORDER_SECRET
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/top-barbershop
+            if [ -n "$ENV_FILE" ]; then printf '%s\n' "$ENV_FILE" | tr -d '\r' > .env; chmod 600 .env; fi
+            test -s .env || { echo "Нет .env: задайте секрет ENV_FILE"; exit 1; }
+            for k in SMTP_PASSWORD ADMIN_NOTIFY_EMAIL SMARTCAPTCHA_SERVER_KEY TOCHKA_JWT TOCHKA_CLIENT_ID TOCHKA_CUSTOMER_CODE TOCHKA_MERCHANT_ID TOCHKA_ORDER_SECRET; do
+              v=$(printenv "$k" | tr -d '\r\n' || true)
+              if [ -n "$v" ]; then sed -i "/^$k=/d" .env; printf '%s=%s\n' "$k" "$v" >> .env; echo "$k: задан отдельным секретом"; fi
+            done
+            unset ENV_FILE SMTP_PASSWORD ADMIN_NOTIFY_EMAIL SMARTCAPTCHA_SERVER_KEY TOCHKA_JWT TOCHKA_CLIENT_ID TOCHKA_CUSTOMER_CODE TOCHKA_MERCHANT_ID TOCHKA_ORDER_SECRET
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            WEB_TAG=${{ github.sha }} docker compose pull web caddy
+            WEB_TAG=${{ github.sha }} docker compose up -d --remove-orphans
+            docker compose exec -T caddy caddy reload --config /etc/caddy/deploy/Caddyfile --adapter caddyfile
+            docker image prune -f
+            sleep 45
+            docker compose ps
+            docker compose logs --tail 30 directus
+            curl -s -o /dev/null -w 'poin: %{http_code}\n' -H 'Host: '$(grep ^SITE_DOMAIN .env | cut -d= -f2) http://127.0.0.1/poin/ || true
