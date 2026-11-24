@@ -75,12 +75,14 @@ const phone = pro ? phoneHref(s.phone) : null;
 const website = pro ? ensureUrl(s.website) : null;
 const booking = pro ? ensureUrl(s.booking_url) || ensureUrl(s.booking_url_alt) : null;
 const socials = (pro ? [['Instagram*', ensureUrl(s.instagram)], ['ВКонтакте', ensureUrl(s.vk)], ['YouTube', ensureUrl(s.youtube)]].filter(([, u]) => u) : []) as [string, string][];
+const sameAs = [website, ...socials.map(([, u]) => u)].filter(Boolean) as string[];
 const ld: any = {
-  '@context': 'https://schema.org', '@type': 'HairSalon', name: s.title, url: abs(`/place/${s.slug}/`),
+  '@context': 'https://schema.org', '@type': 'BarberShop', name: s.title, url: abs(`/place/${s.slug}/`),
   image: gallery.slice(0, 5).map((g) => abs(rel(g)!)), description: clip(descText, 300) || undefined, telephone: (pro && s.phone) || undefined,
   address: s.address ? { '@type': 'PostalAddress', streetAddress: s.address, addressLocality: s.city || undefined, addressCountry: country?.name || undefined } : undefined,
   geo: s.lat && s.lng ? { '@type': 'GeoCoordinates', latitude: s.lat, longitude: s.lng } : undefined,
   priceRange: strizh ? `от ${strizh}` : undefined,
+  sameAs: sameAs.length ? sameAs : undefined,
   openingHoursSpecification: hours.length ? hours.map((h) => ({ '@type': 'OpeningHoursSpecification', dayOfWeek: 'https://schema.org/' + ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][h.day - 1], opens: h.from, closes: h.to })) : undefined,
 };
 if (rating && reviews.length) {
