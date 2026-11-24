@@ -5,6 +5,7 @@ import { listShops, mapPoints, inLocation, splitPage, locationCounts } from '../
 import { inCity } from '../../lib/cases';
 import { cleanHtml, strip, clip, shops } from '../../lib/text';
 import { cityStats } from '../../lib/citystats';
+import { faqLd } from '../../lib/seo';
 
 const { parts, page } = splitPage(Astro.params.path);
 const path = parts.join('/');
@@ -33,7 +34,7 @@ const crumbs: [string, string?][] = [['Главная', '/'], ['Города', '
 if (parent) crumbs.push([parent.name, `/location/${parent.path}/`]);
 crumbs.push([loc.name]);
 ---
-<Listing {h1} {title} {description} {crumbs} base={`/location/${path}/`} {page} {data} {points} intro={cleanHtml(loc.description)} eyebrow={parent?.name}>
+<Listing {h1} {title} {description} {crumbs} base={`/location/${path}/`} {page} {data} {points} intro={cleanHtml(loc.description)} eyebrow={parent?.name} ldExtra={facts && facts.faq.length >= 3 ? faqLd(facts.faq) : null}>
   {(children.length > 0 || metros.length > 0) && (
     <div slot="chips" class="chips" style="margin-top:14px">
       {children.map((c) => <a class="chip" href={`/location/${c.path}/`}>{c.name} <span class="muted">{c.t}</span></a>)}
@@ -70,6 +71,17 @@ crumbs.push([loc.name]);
       )}
     </section>
   )}
+  {facts && facts.faq.length >= 3 && (
+    <section slot="facts" class="cfacts cfaq">
+      <h2>Частые вопросы о барбершопах {where}</h2>
+      {facts.faq.map((f) => (
+        <details>
+          <summary>{f.q}</summary>
+          <p>{f.a}</p>
+        </details>
+      ))}
+    </section>
+  )}
 </Listing>
 <style>
 .cfacts{margin:40px 0;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:24px 28px}
@@ -78,4 +90,8 @@ crumbs.push([loc.name]);
 .cfacts li{margin:4px 0}
 .cfacts-metro{margin:12px 0 0;font-size:14px;line-height:1.7}
 .cfacts-districts{margin:12px 0 0;font-size:14px;line-height:1.7}
+.cfaq details{margin:0;padding:10px 0;border-bottom:1px solid var(--line)}
+.cfaq details:last-child{padding-bottom:0;border-bottom:0}
+.cfaq summary{cursor:pointer;font-weight:600}
+.cfaq details p{margin:8px 0 0}
 </style>
