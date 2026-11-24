@@ -4,6 +4,7 @@ import { sql } from '../../lib/db';
 import { listShops, mapPoints, inLocation, splitPage, locationCounts } from '../../lib/catalog';
 import { inCity } from '../../lib/cases';
 import { cleanHtml, strip, clip, shops } from '../../lib/text';
+import { cityStats } from '../../lib/citystats';
 
 const { parts, page } = splitPage(Astro.params.path);
 const path = parts.join('/');
@@ -19,6 +20,7 @@ const children = all.filter((x) => x.parent_id === loc.id).map((x) => ({ ...x, t
 const parent = loc.parent_id ? all.find((x) => x.id === loc.parent_id) : null;
 const metros = await sql`select m.slug, m.name, count(*)::int n from metro m join barbershop_metro bm on bm.metro_id = m.id join barbershops b on b.id = bm.barbershop_id and b.status='published' join locations l on l.id=b.location_id where ${inLocation(path)} group by m.id order by n desc, m.name limit 60`;
 const where = inCity(loc.name);
+const facts = page === 1 && data.total >= 5 ? await cityStats(path, where) : null;
 const h1 = `Барбершопы ${where}`;
 const title = `Барбершопы ${where}: адреса, цены, отзывы — ${shops(data.total)}`;
 const description = clip(strip(loc.description) || `Все барбершопы ${where} — мужские стрижки, бритьё и уход за бородой. Адреса на карте, цены, фото, рейтинги и онлайн-запись.`, 200);
@@ -33,4 +35,31 @@ crumbs.push([loc.name]);
       {metros.map((m) => <a class="chip" href={`/metro/${m.slug}/`}>м. {m.name.replace(/\s*\((Мск|СПб|Спб)\)/, '')} <span class="muted">{m.n}</span></a>)}
     </div>
   )}
+  {facts && (facts.lines.length > 0 || metros.length > 0) && (
+    <section slot="facts" class="cfacts">
+      <h2>Барбершопы {where}: цифры и факты</h2>
+      {facts.lines.length > 0 && (
+        <ul>
+          {facts.lines.map((line) => <li>{line}</li>)}
+        </ul>
+      )}
+      {metros.length > 0 && (
+        <p class="cfacts-metro">
+          Где искать: {metros.slice(0, 24).map((m, i) => (
+            <>
+              {i > 0 && ', '}
+              <a href={`/metro/${m.slug}/`}>м. {m.name.replace(/\s*\((Мск|СПб|Спб)\)/, '')}</a>
+            </>
+          ))}.
+        </p>
+      )}
+    </section>
+  )}
 </Listing>
+<style>
+.cfacts{margin:40px 0;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:24px 28px}
+.cfacts h2{margin:0 0 12px;font-size:20px}
+.cfacts ul{margin:0;padding-left:20px}
+.cfacts li{margin:4px 0}
+.cfacts-metro{margin:12px 0 0;font-size:14px;line-height:1.7}
+</style>
