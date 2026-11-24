@@ -2,7 +2,8 @@ import { sql } from './db';
 import { inLocation } from './catalog';
 import { plural, shops } from './text';
 
-export type CityFacts = { n: number; lines: string[] };
+export type FaqItem = { q: string; a: string };
+export type CityFacts = { n: number; lines: string[]; faq: FaqItem[] };
 
 const rub = (n: number) => n.toLocaleString('ru-RU') + ' ₽';
 const DATIVE_DAYS = ['понедельникам', 'вторникам', 'средам', 'четвергам', 'пятницам', 'субботам', 'воскресеньям'];
@@ -14,7 +15,7 @@ type Gen = {
 type Prices = { n: number; avg: number | null; med: number | null; mn: number | null; mx: number | null };
 type Peak = { wd: number; n: number };
 
-/** SEO-блок «цифры и факты» для страницы локации. where — название в предложном падеже («в Казани»). */
+/** SEO-блок «цифры и факты» + FAQ для страницы локации. where — название в предложном падеже («в Казани»). */
 export async function cityStats(path: string, where: string): Promise<CityFacts> {
   const loc = inLocation(path);
   const priceFilter = sql`b.services->>'strizh' ~ '^[0-9]+$' and (b.services->>'strizh')::int between 100 and 30000`;
@@ -49,31 +50,27 @@ export async function cityStats(path: string, where: string): Promise<CityFacts>
       where ${loc} group by wd order by n desc`,
   ]);
 
-  const lines: string[] = [];
-  const n = g?.n ?? 0;
+  // Сначала собираем факты как данные, из них — строки блока и ответы FAQ
+  let priceLine = '', diffLine = '', ratingLine = '', bookingLine = '', hoursLine = '', peakLine = '';
 
-  // Цены — только если данных достаточно
   if (p && p.n >= 5 && p.avg && p.med && p.mn && p.mx) {
-    lines.push(
-      `Средняя цена мужской стрижки ${where} — ${rub(p.avg)} (по данным ${shops(p.n)}); медиана ${rub(p.med)}, разброс от ${rub(p.mn)} до ${rub(p.mx)}.`
-    );
+    priceLine = `Средняя цена мужской стрижки ${where} — ${rub(p.avg)} (по данным ${shops(p.n)}); медиана ${rub(p.med)}, разброс от ${rub(p.mn)} до ${rub(p.mx)}.`;
     if (nat && nat.n >= 50 && nat.avg) {
       const diff = Math.round(((p.avg - nat.avg) / nat.avg) * 100);
       if (Math.abs(diff) >= 5) {
-        lines.push(`Это ${diff > 0 ? 'дороже' : 'дешевле'} среднего по России (${rub(nat.avg)}) на ${Math.abs(diff)}%.`);
+        diffLine = `Это ${diff > 0 ? 'дороже' : 'дешевле'} среднего по России (${rub(nat.avg)}) на ${Math.abs(diff)}%.`;
       }
     }
   }
 
+  const n = g?.n ?? 0;
   if (g) {
     if (g.rating_avg && g.reviews_total >= 20) {
-      lines.push(
-        `Средний рейтинг барбершопов города — ${String(g.rating_avg).replace('.', ',')}, суммарно ${g.reviews_total.toLocaleString('ru-RU')} ${plural(g.reviews_total, 'отзыв', 'отзыва', 'отзывов')}.`
-      );
+      ratingLine = `Средний рейтинг барбершопов города — ${String(g.rating_avg).replace('.', ',')}, суммарно ${g.reviews_total.toLocaleString('ru-RU')} ${plural(g.reviews_total, 'отзыв', 'отзыва', 'отзывов')}.`;
     }
     if (n >= 10 && g.with_booking > 0) {
       const pct = Math.round((g.with_booking / n) * 100);
-      lines.push(`Онлайн-запись доступна в ${pct}% барбершопов (${g.with_booking} из ${n}).`);
+      bookingLine = `Онлайн-запись доступна в ${pct}% барбершопов (${g.with_booking} из ${n}).`;
     }
     if (g.with_hours >= 10) {
       const parts: string[] = [];
@@ -81,13 +78,7 @@ export async function cityStats(path: string, where: string): Promise<CityFacts>
       const late = Math.round((g.late_open / g.with_hours) * 100);
       if (sun > 0) parts.push(`${sun}% работают в воскресенье`);
       if (late > 0) parts.push(`${late}% принимают после 21:00`);
-      if (parts.length) lines.push(`Из ${shops(g.with_hours)} с указанным расписанием ${parts.join(', ')}.`);
-    }
-    if (g.new_year >= 3) {
-      lines.push(`За последний год ${where} добавились ${shops(g.new_year)} — рынок растёт.`);
-    }
-    if (g.chains >= 2) {
-      lines.push(`${where[0].toUpperCase() + where.slice(1)} работают ${g.chains} ${plural(g.chains, 'сеть барбершопов', 'сети барбершопов', 'сетей барбершопов')} — есть выбор между локальными мастерами и федеральными брендами.`);
+      if (parts.length) hoursLine = `Из ${shops(g.with_hours)} с указанным расписанием ${parts.join(', ')}.`;
     }
   }
 
@@ -96,15 +87,43 @@ export async function cityStats(path: string, where: string): Promise<CityFacts>
     const totalClicks = peaks.reduce((a, x) => a + x.n, 0);
     const top = peaks.filter((x) => x.n > 0).slice(0, 2);
     if (totalClicks >= 300 && top.length) {
-      // количество дней наблюдений проверяем отдельно, чтобы не гнать фразу на свежих данных
       const [{ days }] = await sql<{ days: number }[]>`
         select count(distinct s.day)::int days from shop_stats s
         join barbershops b on b.id = s.barbershop_id join locations l on l.id = b.location_id where ${loc}`;
       if (days >= 30) {
-        lines.push(`По статистике онлайн-записей чаще всего записываются по ${top.map((x) => DATIVE_DAYS[x.wd - 1]).join(' и ')}.`);
+        peakLine = `По статистике онлайн-записей чаще всего записываются по ${top.map((x) => DATIVE_DAYS[x.wd - 1]).join(' и ')}.`;
       }
     }
   }
 
-  return { n, lines };
+  const lines: string[] = [];
+  if (priceLine) lines.push(diffLine ? `${priceLine} ${diffLine}` : priceLine);
+  if (ratingLine) lines.push(ratingLine);
+  if (bookingLine) lines.push(bookingLine);
+  if (hoursLine) lines.push(hoursLine);
+  if (peakLine) lines.push(peakLine);
+  if (g && g.new_year >= 3) lines.push(`За последний год ${where} добавились ${shops(g.new_year)} — рынок растёт.`);
+  if (g && g.chains >= 2) lines.push(`${where[0].toUpperCase() + where.slice(1)} работают ${g.chains} ${plural(g.chains, 'сеть барбершопов', 'сети барбершопов', 'сетей барбершопов')} — есть выбор между локальными мастерами и федеральными брендами.`);
+
+  const faq: FaqItem[] = [];
+  if (n > 0) {
+    faq.push({
+      q: `Сколько барбершопов ${where}?`,
+      a: `В каталоге сейчас ${shops(n)} ${where} — с адресами на карте, ценами, фото и отзывами. Актуальный список с фильтрами — на этой странице.`,
+    });
+  }
+  if (priceLine) {
+    faq.push({ q: `Сколько стоит мужская стрижка ${where}?`, a: `${priceLine}${diffLine ? ' ' + diffLine : ''} Точную цену смотрите в карточке конкретного барбершопа.` });
+  }
+  if (bookingLine) {
+    faq.push({ q: `Можно ли записаться в барбершоп ${where} онлайн?`, a: `Да. ${bookingLine} Кнопка «Записаться онлайн» есть в карточках таких барбершопов в списке.` });
+  }
+  if (hoursLine) {
+    faq.push({ q: `Работают ли барбершопы ${where} в воскресенье и по вечерам?`, a: `${hoursLine} Расписание конкретного барбершопа указано на его странице.` });
+  }
+  if (peakLine) {
+    faq.push({ q: `В какие дни лучше записываться ${where}?`, a: `${peakLine} Если планируете визит в эти дни — бронируйте заранее, свободных окон меньше.` });
+  }
+
+  return { n, lines, faq };
 }
