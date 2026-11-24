@@ -11,13 +11,15 @@ import type { Card } from '../lib/catalog';
 interface Props {
   h1: string; title: string; description: string; crumbs: [string, string?][]; base: string; page: number;
   data: { items: Card[]; total: number; pages: number }; points?: any[]; intro?: string | null; noindex?: boolean; query?: string; eyebrow?: string;
+  ldExtra?: Record<string, unknown> | null;
 }
-const { h1, title, description, crumbs, base, page, data, points = [], intro, noindex = false, query = '', eyebrow } = Astro.props;
+const { h1, title, description, crumbs, base, page, data, points = [], intro, noindex = false, query = '', eyebrow, ldExtra } = Astro.props;
 const t = page > 1 ? `${title} — страница ${page}` : title;
 // Пагинация: canonical на первую страницу (рекомендация Яндекса), номер страницы — в title
 const canonical = new URL(base, Astro.site).href;
+const jsonLd = ldExtra ? [breadcrumbLd(crumbs), ldExtra] : breadcrumbLd(crumbs);
 ---
-<Base title={t} description={description} canonical={canonical} noindex={noindex} jsonLd={breadcrumbLd(crumbs)}>
+<Base title={t} description={description} canonical={canonical} noindex={noindex} jsonLd={jsonLd}>
   <div class="wrap">
     <Crumbs items={crumbs} />
     <header class="lst-head">
