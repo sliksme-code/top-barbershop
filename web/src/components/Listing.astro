@@ -29,6 +29,7 @@ const canonical = new URL(base, Astro.site).href;
     {page === 1 && points.length > 0 && <div class="lst-map"><YMap points={points} /></div>}
     <div class="grid">{data.items.map((s, i) => <ShopCard s={s} eager={i < 3} level={2} />)}</div>
     <Pager base={base} page={page} pages={data.pages} query={query} />
+    {page === 1 && <slot name="facts" />}
     {page === 1 && intro && <section class="prose lst-intro" set:html={intro} />}
     <slot />
   </div>
