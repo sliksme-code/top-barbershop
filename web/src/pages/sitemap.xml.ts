@@ -18,9 +18,10 @@ export const GET: APIRoute = async () => {
     sql`select slug from schools where status='published'`,
     sql`select slug from vacancies where status='published'`,
   ]);
-  const [prods, kcities] = await Promise.all([
+  const [prods, kcities, rayons] = await Promise.all([
     sql`select slug, updated_at from products where status='published'`,
     sql`select distinct l.path from barbershops b join locations l on l.id=b.location_id where b.status='published' and not coalesce(b.closed,false) and b.amenities ? 'cosmet' and l.path like 'russia/%'`,
+    sql`select distinct l.path as lp, d.slug from districts d join barbershops b on b.district_id = d.id and b.status='published' join locations l on l.id = d.location_id where d.slug is not null`.catch(() => []),
   ]);
   const u: [string, any?][] = [['/'], ['/listings/'], ['/goroda/'], ['/samye-krupnye-seti-barbershopov/'], ['/zhurnal/'], ['/school/'], ['/vacancy/'], ['/add/'], ['/tarify/'], ['/oferta/']];
   scities.forEach((x) => u.push([`/school/school-city/${x.slug}/`]));
@@ -42,9 +43,10 @@ export const GET: APIRoute = async () => {
   Object.keys(COLLECTIONS).forEach((k) => u.push([`/kosmetika/podborki/${k}/`]));
   prods.forEach((x) => u.push([`/kosmetika/p/${x.slug}/`, x.updated_at]));
   kcities.forEach((x) => u.push([`/kosmetika/gde-kupit/${x.path}/`]));
+  rayons.forEach((x) => u.push([`/rayon/${x.lp}/${x.slug}/`]));
   u.push(['/pricheski/'], ['/pricheski/forma-lica/']);
   HAIRCUT_ORDER.forEach((k) => u.push([haircutUrl(k)]));
-  FACE_ORDER.forEach((f) => u.push([faceUrl(f)]));
+  FACE_ORDER.forEach((k) => u.push([faceUrl(k)]));
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${u
     .map(([p, d]) => `<url><loc>${esc(SITE + encodeURI(p))}</loc>${d ? `<lastmod>${new Date(d).toISOString().slice(0, 10)}</lastmod>` : ''}</url>`)

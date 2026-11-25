@@ -21,8 +21,8 @@ const children = all.filter((x) => x.parent_id === loc.id).map((x) => ({ ...x, t
 const parent = loc.parent_id ? all.find((x) => x.id === loc.parent_id) : null;
 const metros = await sql`select m.slug, m.name, count(*)::int n from metro m join barbershop_metro bm on bm.metro_id = m.id join barbershops b on b.id = bm.barbershop_id and b.status='published' join locations l on l.id=b.location_id where ${inLocation(path)} group by m.id order by n desc, m.name limit 60`;
 const where = inCity(loc.name);
-const districts = page === 1 && parent ? await sql<{ name: string; n: number }[]>`
-  select d.name, count(*)::int n from districts d
+const districts = page === 1 && parent ? await sql<{ name: string; slug: string | null; n: number }[]>`
+  select d.name, d.slug, count(*)::int n from districts d
   join barbershops b on b.district_id = d.id and b.status = 'published'
   join locations l on l.id = b.location_id
   where ${inLocation(path)} group by d.id order by n desc, d.name limit 30`.catch(() => []) : []; // до применения 009_districts.sql таблицы нет
@@ -54,7 +54,9 @@ crumbs.push([loc.name]);
           Районы: {districts.map((d, i) => (
             <>
               {i > 0 && ', '}
-              <span>{d.name} <span class="muted">({d.n})</span></span>
+              {d.slug
+                ? <a href={`/rayon/${path}/${d.slug}/`}>{d.name} <span class="muted">({d.n})</span></a>
+                : <span>{d.name} <span class="muted">({d.n})</span></span>}
             </>
           ))}.
         </p>

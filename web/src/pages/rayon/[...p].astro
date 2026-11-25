@@ -1,0 +1,38 @@
+---
+import Listing from '../../components/Listing.astro';
+import { sql } from '../../lib/db';
+import { listShops, mapPoints, splitPage } from '../../lib/catalog';
+import { shops, clip } from '../../lib/text';
+import { inCity } from '../../lib/cases';
+
+// /rayon/<путь города>/<слаг района>/ — SEO-страницы «Барбершопы в Москве — Даниловский район»
+const { parts, page } = splitPage(Astro.params.p);
+if (parts.length < 2) return Astro.rewrite('/404/');
+const dslug = parts[parts.length - 1];
+const locPath = parts.slice(0, -1).join('/');
+const [d] = await sql`
+  select d.id, d.name, l.name as city, l.path as city_path, l.parent_id
+  from districts d join locations l on l.id = d.location_id
+  where d.slug = ${dslug} and l.path = ${locPath}`.catch(() => []); // до применения 011_district_slugs.sql колонки нет
+if (!d) return Astro.rewrite('/404/');
+
+const where = sql`b.district_id = ${d.id}`;
+const data = await listShops(where, page, undefined, true);
+if (page > data.pages && data.total) return Astro.rewrite('/404/');
+const points = page === 1 ? await mapPoints(where) : [];
+const country = d.parent_id ? await sql`select name, path from locations where id = ${d.parent_id}`.then((r) => r[0]) : null;
+
+// Отображаемое имя: «Вахитовский» → «Вахитовский район», «ЖК Арт Сити» и «71-й квартал» — как есть
+const KW = /район|квартал|мкр|микрорайон|жк|посёл|пос\.|село|деревн|станиц|округ|городок/i;
+const dName = KW.test(d.name) ? d.name : /(ский|ской|ный|ной|ий|ый|ая|ое|ее)$/i.test(d.name) ? `${d.name} район` : `район ${d.name}`;
+const whereCity = inCity(d.city);
+const cityPrep = whereCity.startsWith('в ') ? whereCity : `в городе ${d.city}`;
+const h1 = `Барбершопы ${cityPrep} — ${dName}`;
+const title = clip(`${h1}: адреса, цены, отзывы`, 75);
+const description = clip(`${shops(data.total)} ${cityPrep}, ${dName}: мужские стрижки, бритьё и уход за бородой. Адреса на карте, цены, фото, рейтинги и онлайн-запись.`, 200);
+const crumbs: [string, string?][] = [['Главная', '/'], ['Города', '/goroda/']];
+if (country) crumbs.push([country.name, `/location/${country.path}/`]);
+crumbs.push([d.city, `/location/${d.city_path}/`]);
+crumbs.push([dName]);
+---
+<Listing {h1} {title} {description} {crumbs} base={`/rayon/${d.city_path}/${dslug}/`} {page} {data} {points} noindex={data.total === 0} eyebrow={d.city} />
