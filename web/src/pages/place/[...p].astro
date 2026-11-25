@@ -28,13 +28,22 @@ if (!s) {
   return Astro.rewrite('/404/');
 }
 
-const [metros, colls, reviews, labels, country] = await Promise.all([
+const [metros, colls, reviews, labels, country, ycServices, ycStaff] = await Promise.all([
   sql`select m.slug, m.name from barbershop_metro bm join metro m on m.id = bm.metro_id where bm.barbershop_id = ${s.id} order by m.name`,
   sql`select c.slug, c.name from barbershop_collections bc join collections c on c.id = bc.collection_id where bc.barbershop_id = ${s.id}`,
   sql`select author_name, rating, pros, cons, content, created_at from reviews where barbershop_id = ${s.id} and status = 'published' order by created_at desc`,
   featureLabels(),
   s.city_parent ? sql`select name, path from locations where id = ${s.city_parent}`.then((r) => r[0]) : Promise.resolve(null),
+  sql`select title, category, price_min::float as pmin, price_max::float as pmax from yclients_services where barbershop_id = ${s.id} order by category nulls last, price_min nulls last, title`.catch(() => []),
+  sql`select name, specialization, rating::float as rating, reviews, avatar from yclients_staff where barbershop_id = ${s.id} order by rating desc nulls last, reviews desc`.catch(() => []),
 ]);
+const ycGroups: [string, any[]][] = [];
+for (const x of ycServices as any[]) {
+  const k = x.category || 'Услуги';
+  const g = ycGroups.find((g) => g[0] === k);
+  if (g) g[1].push(x); else ycGroups.push([k, [x]]);
+}
+const ycDate = s.yclients_synced_at ? dateRu(s.yclients_synced_at) : null;
 const near: Card[] = s.lat && s.lng
   ? await sql`select b.id, b.slug, b.title, coalesce(b.cover_image, b.gallery->>0) as cover, b.rating::float as rating, coalesce(b.reviews_count,0) as reviews_count,
       coalesce(b.closed,false) as closed, coalesce(b.featured,false) as featured, b.address, b.services->>'strizh' as price, l.name as city, l.path as city_path, b.lat, b.lng,
@@ -140,6 +149,36 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
             <h2>Цены на услуги</h2>
             <ul class="pl-prices">{services.map((x) => <li><span>{x.label}</span><b>{rub(x.price)}</b></li>)}</ul>
             <p class="muted pl-note">Цены указаны владельцем барбершопа и могли измениться — уточняйте при записи.</p>
+          </section>
+        )}
+        {ycStaff.length > 0 && (
+          <section class="panel">
+            <h2>Мастера</h2>
+            <ul class="pl-staff">
+              {ycStaff.map((m) => (
+                <li>
+                  {m.avatar ? <img src={m.avatar} alt={`${m.name} — ${m.specialization || 'барбер'}, ${s.title}`} width="96" height="96" loading="lazy" decoding="async" onerror="this.remove()" /> : <span class="pl-ava">{m.name.trim()[0]}</span>}
+                  <div>
+                    <b>{m.name}</b>
+                    {m.specialization && <span class="muted"> · {m.specialization}</span>}
+                    {m.rating ? <span class="pl-rate"><span class="stars">★</span> {m.rating.toFixed(1)}{m.reviews ? ` · ${m.reviews} ${plural(m.reviews, 'отзыв', 'отзыва', 'отзывов')}` : ''}</span> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {ycDate && <p class="muted pl-note">Состав мастеров обновлён {ycDate} из онлайн-записи.</p>}
+          </section>
+        )}
+        {ycServices.length > 0 && (
+          <section class="panel">
+            <h2>Актуальные цены из онлайн-записи</h2>
+            {ycGroups.map(([cat, items]) => (
+              <div class="pl-ycat">
+                {ycGroups.length > 1 && <h3 class="h4">{cat}</h3>}
+                <ul class="pl-prices">{items.map((x: any) => <li><span>{x.title}</span><b>{x.pmin && x.pmax && x.pmin !== x.pmax ? `${rub(x.pmin)}–${rub(x.pmax)}` : rub(x.pmin || x.pmax)}</b></li>)}</ul>
+              </div>
+            ))}
+            {ycDate && <p class="muted pl-note">Цены обновлены {ycDate} из системы онлайн-записи — итоговая стоимость зависит от выбранного мастера.</p>}
           </section>
         )}
         {s.description && (
@@ -266,6 +305,15 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
 .rv-h{margin-bottom:6px}
 
 .claim-f{margin:6px 0 0}
+.pl-staff{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.pl-staff li{display:flex;gap:12px;align-items:center;min-width:0}
+.pl-staff img,.pl-ava{width:48px;height:48px;border-radius:50%;object-fit:cover;flex:none;background:#2a2520}
+.pl-ava{display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--brass);font-size:20px}
+.pl-staff li>div{min-width:0}
+.pl-staff b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pl-rate{display:block;font-size:13px;margin-top:2px}
+.pl-ycat+.pl-ycat{margin-top:14px}
+.h4{font-size:16px;margin:0 0 4px;color:var(--muted);font-weight:600}
 .upsell{border-color:var(--brass);background:#fffaf0}.upsell p{margin:0 0 8px}
 .fav.on{background:var(--ink);color:#fff}
 .rv-form{margin-top:12px}.rv-form summary{list-style:none;display:inline-flex}.rv-form summary::-webkit-details-marker{display:none}.rv-form form{margin-top:16px}
