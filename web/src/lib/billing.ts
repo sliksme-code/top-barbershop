@@ -26,6 +26,11 @@ export const SELLER = {
 
 export const isPro = (s: { pro_until?: Date | string | null }) => Boolean(s.pro_until && new Date(s.pro_until).getTime() > Date.now());
 
+/** Промо: до 31.12.2026 включительно контакты, сайт и онлайн-запись видны у всех (тариф «Стандарт» открыт). */
+export const OPEN_UNTIL = new Date('2026-12-31T23:59:59+03:00');
+/** Видимость контактов в карточке: PRO или пока идёт промо. Реальный тариф — isPro. */
+export const isOpen = (s: { pro_until?: Date | string | null }) => isPro(s) || Date.now() < OPEN_UNTIL.getTime();
+
 /** Понедельник недели (UTC-дата, строка YYYY-MM-DD) */
 export function monday(d = new Date()) {
   const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
@@ -125,7 +130,7 @@ export async function embeddedPayment(order: { id: number; amount: number; payme
   if (!paymentsEnabled) return null;
   if (order.payment_id) {
     const r = await fetch(`https://api.yookassa.ru/v3/payments/${encodeURIComponent(order.payment_id)}`, { headers: { Authorization: auth() }, signal: AbortSignal.timeout(15000) }).catch(() => null);
-    const p: any = r?.ok ? await r.json() : null;
+    const p: any = await r?.ok ? await r.json() : null;
     if (p?.status === 'succeeded' || p?.status === 'waiting_for_capture') { await syncPayment(p.id); return { paid: true }; }
     if (p?.status === 'pending' && p.confirmation?.type === 'embedded' && p.confirmation.confirmation_token) return { token: p.confirmation.confirmation_token as string };
   }
