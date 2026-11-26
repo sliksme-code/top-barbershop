@@ -2,7 +2,7 @@
 import AccountLayout from '../components/AccountLayout.astro';
 import '../styles/forms.css';
 import { sql } from '../lib/db';
-import { isPro } from '../lib/billing';
+import { isPro, isOpen, OPEN_UNTIL, PRICE } from '../lib/billing';
 import { shopStats, STATS_SINCE } from '../lib/stats';
 import { dateRu } from '../lib/text';
 
@@ -45,10 +45,12 @@ const periodLabel = { 7: '7 дней', 30: '30 дней', 90: '90 дней' } as
   <div class="st-list">
     {data.map(({ s, st }) => {
       const pro = isPro(s);
+      const open = isOpen(s);
+      const promo = !pro && open;
       return (
         <section class="panel st">
           <header class="st-h">
-            <div><h2><a href={`/place/${s.slug}/`}>{s.title}</a></h2><p class="muted">{s.city}{pro ? ' · PRO' : ' · бесплатный тариф'}</p></div>
+            <div><h2><a href={`/place/${s.slug}/`}>{s.title}</a></h2><p class="muted">{s.city}{pro ? ' · PRO' : promo ? ` · Стандарт · промо до ${dateRu(OPEN_UNTIL)}` : ' · бесплатный тариф'}</p></div>
           </header>
           {!st ? <p class="alt">Статистика появится после публикации барбершопа.</p> : (
             <>
@@ -57,7 +59,7 @@ const periodLabel = { 7: '7 дней', 30: '30 дней', 90: '90 дней' } as
                   ['Показы в каталоге', st.tot.impressions, delta(st.tot.impressions, st.prev.impressions), 'карточка появилась в списке города, метро, сети или в блоке «рядом»'],
                   ['Просмотры карточки', st.tot.views, delta(st.tot.views, st.prev.views), `открыли страницу барбершопа · CTR ${pct(st.tot.views, st.tot.impressions)}`],
                   ['Клики по контактам', st.contacts, delta(st.contacts, st.prev.contacts), `запись, телефон, сайт, соцсети · ${pct(st.contacts, st.tot.views)} от просмотров`],
-                  ['Записаться онлайн', st.tot.booking, null, pro ? 'нажали кнопку записи' : 'кнопка скрыта на бесплатном тарифе'],
+                  ['Записаться онлайн', st.tot.booking, null, open ? (promo ? 'нажали кнопку записи · открыта промо' : 'нажали кнопку записи') : 'кнопка скрыта на бесплатном тарифе'],
                 ].map(([l, v, dl, hint]: any) => (
                   <div class="kpi-i">
                     <span class="kpi-l">{l}</span>
@@ -85,7 +87,13 @@ const periodLabel = { 7: '7 дней', 30: '30 дней', 90: '90 дней' } as
                   <tr><td>Соцсети</td><td>{fmt(st.tot.social)}</td></tr>
                 </tbody>
               </table>
-              {!pro && (
+              {promo && (
+                <div class="upsell">
+                  <p><b>Промо до {dateRu(OPEN_UNTIL)}: ваши контакты и кнопка записи видны всем.</b>{st.contacts ? ` За период по ним перешли ${fmt(st.contacts)} раз — после промо они снова будут видны только на PRO.` : ' После промо контакты снова будут видны только на PRO.'}</p>
+                  <a class="btn brass sm" href={`/billing/?id=${s.id}`}>Сохранить после промо — PRO {PRICE.pro} ₽/мес</a>
+                </div>
+              )}
+              {!pro && !open && (
                 <div class="upsell">
                   <p><b>На бесплатном тарифе телефон, сайт и кнопка записи скрыты</b>{st.tot.views ? ` — ${fmt(st.tot.views)} ${st.tot.views === 1 ? 'человек открыл' : 'человек открыли'} карточку, но не смогли с вами связаться.` : '.'}</p>
                   <a class="btn brass sm" href={`/billing/?id=${s.id}`}>Подключить PRO — 990 ₽/мес</a>
@@ -108,7 +116,7 @@ const periodLabel = { 7: '7 дней', 30: '30 дней', 90: '90 дней' } as
 </AccountLayout>
 <style>
 .st-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap;max-width:1000px}.st-top .alt{margin:0;max-width:620px}
-.st-per{display:flex;gap:6px}.st-per a{padding:7px 12px;border:1px solid var(--line);border-radius:999px;text-decoration:none;font-size:14px;font-weight:600;background:#fff;color:var(--ink)}.st-per a.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.st-per{display:flex;gap:6px}.st-per a{padding:7px 12px;border:1px solid var(--line);border-radius:999px;text-decoration:none;font-size:14px;font-weight:600;background:#fff;color:var(--ink)}.st-per a.on{background:var(--ink);color:#fff}
 .st-list{display:grid;gap:18px;max-width:1000px;margin-top:18px}
 .st-h h2{margin:0;font-size:22px}.st-h h2 a{text-decoration:none;color:inherit}.st-h p{margin:2px 0 0}
 .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr));gap:10px;margin:14px 0}
