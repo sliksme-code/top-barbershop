@@ -7,11 +7,11 @@ import { sql } from '../../lib/db';
 import { featureLabels, type Card } from '../../lib/catalog';
 import { img, rel } from '../../lib/img';
 import { breadcrumbLd, abs } from '../../lib/seo';
-import { cleanHtml, strip, clip, rub, phoneHref, ensureUrl, dateRu, plural, fillAlt, shops as shopsWord } from '../../lib/text';
+import { cleanHtml, strip, clip, rub, phoneHref, ensureUrl, withUtm, dateRu, plural, fillAlt, shops as shopsWord } from '../../lib/text';
 import { site } from '../../data/site';
 import { inCity } from '../../lib/cases';
 import Captcha from '../../components/Captcha.astro';
-import { isPro, PRICE } from '../../lib/billing';
+import { isPro, isOpen, PRICE } from '../../lib/billing';
 import '../../styles/forms.css';
 
 const parts = (Astro.params.p || '').split('/').filter(Boolean);
@@ -78,16 +78,18 @@ if (country) crumbs.push([country.name, `/location/${country.path}/`]);
 if (s.city) crumbs.push([s.city, `/location/${s.city_path}/`]);
 crumbs.push([s.title]);
 
-// Тариф: телефон, сайт, онлайн-запись и соцсети показываем только у PRO
+// Тариф: телефон, сайт, онлайн-запись и соцсети видны у PRO; до 31.12.2026 — у всех (промо)
 const pro = isPro(s);
-const phone = pro ? phoneHref(s.phone) : null;
-const website = pro ? ensureUrl(s.website) : null;
-const booking = pro ? ensureUrl(s.booking_url) || ensureUrl(s.booking_url_alt) : null;
-const socials = (pro ? [['Instagram*', ensureUrl(s.instagram)], ['ВКонтакте', ensureUrl(s.vk)], ['YouTube', ensureUrl(s.youtube)]].filter(([, u]) => u) : []) as [string, string][];
-const sameAs = [website, ...socials.map(([, u]) => u)].filter(Boolean) as string[];
+const open = isOpen(s);
+const campaign = pro ? 'pro' : 'standard';
+const phone = open ? phoneHref(s.phone) : null;
+const website = open ? withUtm(ensureUrl(s.website), campaign) : null;
+const booking = open ? withUtm(ensureUrl(s.booking_url) || ensureUrl(s.booking_url_alt), campaign) : null;
+const socials = (open ? [['Instagram*', ensureUrl(s.instagram)], ['ВКонтакте', ensureUrl(s.vk)], ['YouTube', ensureUrl(s.youtube)]].filter(([, u]) => u) : []) as [string, string][];
+const sameAs = [open ? ensureUrl(s.website) : null, ...socials.map(([, u]) => u)].filter(Boolean) as string[];
 const ld: any = {
   '@context': 'https://schema.org', '@type': 'BarberShop', name: s.title, url: abs(`/place/${s.slug}/`),
-  image: gallery.slice(0, 5).map((g) => abs(rel(g)!)), description: clip(descText, 300) || undefined, telephone: (pro && s.phone) || undefined,
+  image: gallery.slice(0, 5).map((g) => abs(rel(g)!)), description: clip(descText, 300) || undefined, telephone: (open && s.phone) || undefined,
   address: s.address ? { '@type': 'PostalAddress', streetAddress: s.address, addressLocality: s.city || undefined, addressCountry: country?.name || undefined } : undefined,
   geo: s.lat && s.lng ? { '@type': 'GeoCoordinates', latitude: s.lat, longitude: s.lng } : undefined,
   priceRange: strizh ? `от ${strizh}` : undefined,
@@ -233,7 +235,7 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
             {s.address && <><dt>Адрес</dt><dd>{s.address}{s.city ? `, ${s.city}` : ''}</dd></>}
             {metroNames.length > 0 && <><dt>Метро</dt><dd>{metroNames.join(', ')}</dd></>}
             {phone && !s.closed && <><dt>Телефон</dt><dd><a href={phone} data-goal={site.goals.callShop} data-stat="phone" data-sid={s.id}>{s.phone}</a></dd></>}
-            {website && <><dt>Сайт</dt><dd><a href={website} target="_blank" rel="nofollow noopener" data-goal={site.goals.siteClick} data-stat="site" data-sid={s.id}>{website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}</a></dd></>}
+            {website && <><dt>Сайт</dt><dd><a href={website} target="_blank" rel="nofollow noopener" data-goal={site.goals.siteClick} data-stat="site" data-sid={s.id}>{website.replace(/^https?:\/\/(www\.)?/, '').replace(/[?#].*$/, '').replace(/\/$/, '')}</a></dd></>}
             {hours.length > 0 && <><dt>Часы работы</dt><dd>{sameHours ? <>Ежедневно {hours[0].from}–{hours[0].to}</> : <ul class="pl-hours">{hours.map((h) => <li><span>{DAYS[h.day - 1]}</span> {h.from && h.to ? `${h.from}–${h.to}` : 'выходной'}</li>)}</ul>}</dd></>}
           </dl>
           {socials.length > 0 && <div class="chips">{socials.map(([n, u]) => <a class="chip" href={u} target="_blank" rel="nofollow noopener" data-stat="social" data-sid={s.id}>{n}</a>)}</div>}
@@ -241,7 +243,7 @@ const og = gallery[0] ? abs(img(gallery[0], 1200, 630)) : undefined;
           {!s.closed && booking && <a class="btn brass pl-wide" href={booking} target="_blank" rel="nofollow noopener" data-goal={site.goals.booking} data-stat="booking" data-sid={s.id}>Записаться онлайн</a>}
         </div>
         {s.lat && s.lng && <YMap points={[{ title: s.title, lat: s.lat, lng: s.lng, address: s.address }]} zoom={15} height={300} />}
-        {mine && !pro && (
+        {mine && !open && (
           <div class="panel upsell">
             <p class="eyebrow">Видно только вам</p>
             <p><b>Телефон, сайт и онлайн-запись скрыты</b> — на бесплатном тарифе клиенты их не видят.</p>

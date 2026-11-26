@@ -25,3 +25,15 @@ export const fillAlt = (html: string, alt: string) =>
   html.replace(/<img\b([^>]*)>/gi, (m, a) => (/\balt="[^"]+"/.test(a) ? m : `<img alt="${alt.replace(/"/g, '&quot;')}"${a.replace(/\salt=""/, '')}>`));
 export const phoneHref = (p?: string | null) => (p ? 'tel:' + p.replace(/[^\d+]/g, '') : null);
 export const ensureUrl = (u?: string | null) => (!u ? null : /^https?:\/\//.test(u) ? u : 'https://' + u.replace(/^\/+/, ''));
+/** Добавляет utm_source=topbarbershop.com и utm_campaign=<тариф> к внешней ссылке барбершопа */
+export const withUtm = (u: string | null, campaign: string) => {
+  if (!u) return null;
+  try {
+    const x = new URL(u);
+    if (!x.searchParams.has('utm_source')) x.searchParams.set('utm_source', 'topbarbershop.com');
+    if (!x.searchParams.has('utm_campaign')) x.searchParams.set('utm_campaign', campaign);
+    return x.toString();
+  } catch {
+    return u;
+  }
+};
