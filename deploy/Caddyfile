@@ -82,9 +82,13 @@ http://{$PROD_DOMAIN}, http://www.{$PROD_DOMAIN} {
 	redir https://{$PROD_DOMAIN}{uri} 301
 }
 
-# Тестовый домен — тот же сайт, но noindex (решает приложение по имени хоста)
+# Тестовый домен — тот же сайт, закрыт от индексации всеми способами:
+# приложение отдаёт robots.txt «Disallow: /» + мета noindex, здесь — X-Robots-Tag на ВСЕ ответы
+# (включая /media, /img и проксированные страницы) и редирект sitemap на боевой домен
 {$SITE_DOMAIN} {
 	import newsite
+	header X-Robots-Tag "noindex, nofollow"
+	redir /sitemap.xml https://{$PROD_DOMAIN}/sitemap.xml 301
 }
 
 www.{$PROD_DOMAIN} {

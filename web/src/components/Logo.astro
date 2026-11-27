@@ -1,12 +1,12 @@
 ---
-const { light = true } = Astro.props;
+const { light = true, width = 120 } = Astro.props;
+const src = light ? '/logos/topbs-logo-white.svg' : '/logos/topbs-logo.svg';
+const height = Math.round(width * 383 / 980);
 ---
 <span class="logo">
-  <svg width="26" height="34" viewBox="0 0 26 34" aria-hidden="true"><rect x="3" y="0" width="20" height="4" rx="2" fill="#d9b46e"/><rect x="5" y="4" width="16" height="26" rx="3" fill="#fff"/><path d="M5 9l16-5v6L5 15zM5 19l16-5v6L5 25z" fill="#a3312b"/><rect x="3" y="30" width="20" height="4" rx="2" fill="#d9b46e"/></svg>
-  <span class="logo-t"><b>TOP</b> BARBERSHOP</span>
+  <img src={src} width={width} height={height} alt="TOP BARBERSHOP" loading="eager" decoding="async" />
 </span>
 <style>
-.logo{display:inline-flex;align-items:center;gap:10px}
-.logo-t{font-weight:500;letter-spacing:.16em;font-size:15px;white-space:nowrap}
-.logo-t b{font-weight:850;color:var(--brass2)}
+.logo{display:inline-flex;align-items:center}
+.logo img{display:block}
 </style>
